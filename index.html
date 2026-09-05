@@ -25,7 +25,7 @@
       <button id="newNoteBtn" class="w-full rounded-xl bg-ink px-3.5 py-3 text-left font-semibold text-white transition hover:bg-stone-700"><span class="mr-1 text-lg">＋</span> New note</button>
       <div class="flex justify-between px-1 pt-4 pb-2 text-[11px] font-bold uppercase tracking-widest text-stone-500 md:px-2 md:pt-6"><span>Notes</span><span id="noteCount">0</span></div>
       <div id="historyList" class="flex max-h-40 flex-col gap-1 overflow-auto md:max-h-none md:flex-1"><div id="historyEmpty" class="p-2 text-xs text-stone-500">No notes yet</div></div>
-      <div class="mt-auto hidden border-t border-stone-200 px-2 pt-4 text-xs text-stone-500 md:block"><div class="font-medium text-stone-700">On-device storage</div><div id="diskUsage" class="mt-1">Checking storage…</div><div id="diskRemaining" class="mt-0.5">Nothing leaves this device</div></div>
+      <div class="mt-auto hidden border-t border-stone-200 px-2 pt-4 text-xs text-stone-500 md:block"><div class="font-medium text-stone-700">On-device storage</div><div id="diskUsage" class="mt-1">Checking storage…</div><div class="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200"><i id="diskUsageBar" class="block h-full w-0 rounded-full bg-accent transition-all"></i></div><div id="diskRemaining" class="mt-1">Nothing leaves this device</div></div>
     </aside>
     <main class="w-full max-w-5xl px-5 py-5 md:px-[7vw] md:py-7">
       <div id="processingStatus" class="hidden mb-3 w-fit rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-medium text-violet-700"></div>
@@ -43,6 +43,6 @@
       </section>
     </main>
   </div>
-  <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(console.warn);</script>
+  <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").then(registration=>registration.update()).catch(console.warn);</script>
   <script type="module" src="./app.js"></script>
 </body></html>
