@@ -3,135 +3,45 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-  <meta name="theme-color" content="#0b0d12">
-  <meta name="description" content="Private browser-based speech to text. Audio is processed locally on your device.">
+  <meta name="theme-color" content="#f7f7f5">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
-  <title>Local Transcriber</title>
+  <title>Jot — private voice notes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { paper:"#f7f7f5", ink:"#1c1c1a", accent:"#6257e8" } } } }
+  </script>
   <style>
-    :root{--bg:#0b0d12;--panel:#11141c;--panel2:#171b25;--border:#2b3040;--text:#f5f7fb;--muted:#aeb5c5;--accent:#8b5cf6;--accent2:#a78bfa;--ok:#5ee27a;--danger:#ff6b81}
-    *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-    body{min-height:100svh}.app{width:min(100%,760px);margin:auto;padding:18px 14px 100px}
-    header{display:flex;align-items:center;gap:12px;padding:6px 2px 18px}.logo{width:48px;height:48px}.brand h1{font-size:25px;margin:0}.brand p{margin:2px 0 0;color:var(--muted);font-size:13px}.brand strong{color:var(--ok)}
-    .card{background:linear-gradient(145deg,var(--panel2),var(--panel));border:1px solid var(--border);border-radius:22px;padding:18px;margin:12px 0;box-shadow:0 10px 35px #0004}
-    .row{display:flex;gap:12px;align-items:center;justify-content:space-between}.grow{flex:1}.muted{color:var(--muted)}.small{font-size:13px}
-    select,button{font:inherit}select{background:#202532;color:var(--text);border:1px solid #3a4050;border-radius:12px;padding:10px 12px}
-    button{border:0;color:var(--text);background:#202532;border:1px solid var(--border);border-radius:14px;padding:11px 15px;cursor:pointer;touch-action:manipulation}
-    button:disabled{opacity:.45;cursor:not-allowed}.primary{background:var(--accent);border-color:var(--accent);font-weight:700}.danger{background:#391b25;border-color:#5b2635}.hidden{display:none!important}
-    .download{width:100%;margin-top:14px;padding:14px}.progress{height:8px;background:#252a36;border-radius:99px;overflow:hidden;margin-top:12px}.progress>i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
-    .statusgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.status{padding:12px;background:#0d1017;border:1px solid #252a35;border-radius:15px}.status b{display:block;margin-bottom:3px}.ok{color:var(--ok)}
-    .rec{text-align:center;padding:30px 12px}.timer{font-size:38px;font-variant-numeric:tabular-nums}.state{color:var(--muted);margin:4px 0 24px}
-    #recordBtn{width:128px;height:128px;border-radius:50%;font-size:50px;background:#171b25;border:3px solid var(--accent);box-shadow:0 0 35px #8b5cf655;margin:0 auto 18px}
-    #recordBtn.recording{border-color:var(--danger);box-shadow:0 0 35px #ff6b8155}
-    .wave{height:30px;display:flex;align-items:center;justify-content:center;gap:4px;margin-top:15px}.wave i{width:4px;height:5px;background:var(--accent2);border-radius:3px;transition:height .08s}
-    textarea{width:100%;min-height:220px;resize:vertical;background:#0d1017;color:var(--text);border:1px solid #2b3040;border-radius:15px;padding:15px;font:16px/1.55 system-ui}.actions{display:flex;gap:8px}
-    .markdown-preview{min-height:120px;background:#0d1017;color:var(--text);border:1px solid #2b3040;border-radius:15px;padding:15px 18px;font-size:15px;line-height:1.6}
-    .markdown-preview.empty{color:var(--muted);display:flex;align-items:center}
-    .markdown-preview h2{font-size:16px;margin:14px 0 8px;color:var(--accent2)}.markdown-preview h2:first-child{margin-top:0}
-    .markdown-preview ul{margin:6px 0;padding-left:22px}.markdown-preview li{margin:4px 0}
-    .markdown-preview li input[type=checkbox]{margin-right:6px}
-    .markdown-preview p{margin:6px 0}.markdown-preview strong{color:var(--text)}
-    button.small{padding:7px 12px;font-size:13px;border-radius:10px}
-    .history-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
-    .history-item{background:#0d1017;border:1px solid #252a35;border-radius:15px;padding:14px}
-    .history-item .actions{flex-wrap:wrap;justify-content:flex-end}
-    .history-item details{margin-top:10px}
-    .history-item summary{cursor:pointer;color:var(--muted)}
-    .history-item summary::marker{color:var(--accent2)}
-    .transcript-text{white-space:pre-wrap;color:var(--text);margin:8px 0 0;font-size:14px;line-height:1.5}
-    .history-item .markdown-preview{margin-top:10px;padding:12px 14px;font-size:14px}
-    .hist-audio{width:100%;margin-top:10px}
-    .notice{background:#151923;border:1px solid #33394a;border-radius:14px;padding:12px;margin-top:10px}.error{color:#ff9baa}.footer{text-align:center;color:#737b8c;font-size:12px;margin:22px 0}
-    @media(min-width:600px){.statusgrid{grid-template-columns:repeat(4,1fr)}.app{padding-top:28px}}
+    .note-item{width:100%;border-radius:.625rem;padding:.7rem;text-align:left}.note-item:hover{background:#f0f0eb}.note-item.active{background:#eeecff}.note-item b,.note-item span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.note-item b{font-size:.875rem}.note-item span{margin-top:.125rem;font-size:.75rem;color:#777771}.note-item small{display:block;margin-top:.3rem;font-size:.6875rem;color:#777771}.wave i{height:4px;width:3px;border-radius:99px;background:#aaa5ef;transition:height .08s}
   </style>
 </head>
-<body>
-<main class="app">
-  <header>
-    <img class="logo" src="./icon.svg" alt="">
-    <div class="brand"><h1>Local Transcriber</h1><p><strong>100% Private</strong> · Runs locally · No uploads</p></div>
-  </header>
-
-  <section class="card" id="modelCard">
-    <div class="row">
-      <div class="grow"><b id="modelTitle">Speech model</b><div class="muted small" id="modelText">A small Whisper model is downloaded once and then reused locally.</div></div>
-      <select id="modelSelect" aria-label="Whisper model">
-        <option value="Xenova/whisper-tiny.en">Tiny English</option>
-        <option value="Xenova/whisper-base.en">Base English</option>
-      </select>
-    </div>
-    <button id="loadBtn" class="primary download">Download / load Whisper model</button>
-    <div class="progress hidden" id="progress"><i></i></div>
-    <div class="small muted" id="progressText"></div>
-    <div class="notice small">First use needs internet to download the model. Once cached by the browser, transcription can work without an internet connection. A separate small summary model also downloads quietly in the background — no extra tap needed.</div>
-  </section>
-
-  <section class="card">
-    <div class="statusgrid">
-      <div class="status"><b id="network">Checking…</b><span class="muted small">Network</span></div>
-      <div class="status"><b id="engine">Checking…</b><span class="muted small">Engine</span></div>
-      <div class="status"><b>English</b><span class="muted small">Language</span></div>
-      <div class="status"><b class="ok">Local</b><span class="muted small">Processing</span></div>
-    </div>
-  </section>
-
-  <section class="card rec">
-    <div class="timer" id="timer">00:00</div>
-    <div class="state" id="state">Load the model, then tap the microphone</div>
-    <button id="recordBtn" disabled aria-label="Start recording">🎙️</button>
-    <div class="muted">Tap to start · tap again to stop</div>
-    <div class="wave" id="wave"></div>
-    <div class="notice error hidden" id="error"></div>
-  </section>
-
-  <section class="card">
-    <div class="row">
-      <h2 style="margin:0">Transcription</h2>
-      <div class="actions">
-        <button id="copyBtn" disabled>Copy</button>
-        <button id="downloadTxtBtn" disabled>TXT</button>
-        <button id="clearBtn">Clear</button>
+<body class="min-h-screen bg-paper font-sans text-ink">
+  <span class="hidden !bg-rose-600 shadow-rose-300/40"></span>
+  <div class="grid min-h-screen md:grid-cols-[292px_minmax(0,1fr)]">
+    <aside class="flex min-h-auto flex-col border-b border-stone-200 bg-stone-50 px-3 py-4 md:min-h-screen md:border-b-0 md:border-r md:px-4 md:py-6">
+      <div class="flex items-center gap-2.5 px-1 pb-3 md:px-2 md:pb-6">
+        <img class="h-8 w-8" src="./icon.svg" alt=""><div><b class="text-lg tracking-tight">Jot</b><span class="block text-xs text-stone-500">Private voice notes</span></div>
       </div>
-    </div>
-    <textarea id="output" placeholder="Your transcription will appear here…" spellcheck="true"></textarea>
-  </section>
-
-  <section class="card" id="summaryCard">
-    <div class="row">
-      <div class="grow"><b id="sumTitle">Summary</b><div class="muted small" id="sumStatus">Summary model downloading in the background…</div></div>
-      <button id="summarizeBtn" disabled>Summarize</button>
-    </div>
-    <div class="progress hidden" id="sumProgress"><i></i></div>
-    <div class="row" style="margin-top:8px">
-      <span class="muted small">Notes are organized automatically into key points and action items.</span>
-      <button id="toggleSumViewBtn" class="small">View markdown</button>
-    </div>
-    <div id="summaryPreview" class="markdown-preview empty">Your organized notes will appear here…</div>
-    <textarea id="summaryOutput" class="hidden" placeholder="Raw markdown notes will appear here…" spellcheck="true"></textarea>
-    <div class="actions" style="margin-top:10px">
-      <button id="copySumBtn" disabled>Copy</button>
-      <button id="downloadSumTxtBtn" disabled>MD</button>
-      <button id="clearSumBtn">Clear</button>
-    </div>
-    <div class="notice small">Summarization runs locally too, using a small on-device model. It downloads quietly in the background so it's usually ready by the time you have a transcript.</div>
-  </section>
-
-  <section class="card" id="historyCard">
-    <div class="row">
-      <h2 style="margin:0">History</h2>
-      <button id="clearHistoryBtn" class="small danger">Clear all</button>
-    </div>
-    <div class="muted small" id="storageInfo"></div>
-    <div class="notice small">Past recordings — audio, transcript, and summary — are kept only on this device (in the browser's local storage). Nothing is uploaded, and clearing browser data for this site removes them too.</div>
-    <div id="historyList" class="history-list">
-      <div class="muted small" id="historyEmpty">No recordings yet — record something above and it'll show up here.</div>
-    </div>
-  </section>
-
-  <p class="footer">Local Transcriber · Whisper via Transformers.js · Audio stays on this device after processing.</p>
-</main>
-
-<script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(console.warn);</script>
-<script type="module" src="./app.js"></script>
-</body>
-</html>
+      <button id="newNoteBtn" class="w-full rounded-xl bg-ink px-3.5 py-3 text-left font-semibold text-white transition hover:bg-stone-700"><span class="mr-1 text-lg">＋</span> New note</button>
+      <div class="flex justify-between px-1 pt-4 pb-2 text-[11px] font-bold uppercase tracking-widest text-stone-500 md:px-2 md:pt-6"><span>Notes</span><span id="noteCount">0</span></div>
+      <div id="historyList" class="flex max-h-40 flex-col gap-1 overflow-auto md:max-h-none md:flex-1"><div id="historyEmpty" class="p-2 text-xs text-stone-500">No notes yet</div></div>
+      <div class="mt-auto hidden px-2 pt-4 text-xs text-stone-500 md:block">Stored only on this device</div>
+    </aside>
+    <main class="w-full max-w-5xl px-5 py-5 md:px-[7vw] md:py-7">
+      <div class="mb-7 flex items-center justify-between md:mb-11"><span class="text-[13px] text-stone-500">Private · on-device transcription</span><button id="settingsBtn" class="grid h-9 w-9 place-items-center rounded-lg border border-stone-200 bg-white text-lg hover:bg-stone-50" aria-label="Model settings">⚙</button></div>
+      <details id="modelCard" class="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
+        <summary class="cursor-pointer text-[13px] text-stone-500">Speech model &amp; local processing</summary>
+        <div class="pt-3.5"><div class="flex flex-wrap gap-2.5"><select id="modelSelect" class="min-w-40 flex-1 rounded-lg border border-stone-200 bg-white px-2 py-2"><option value="Xenova/whisper-tiny.en">Tiny English — fast</option><option value="Xenova/whisper-base.en">Base English — more accurate</option></select><button id="loadBtn" class="rounded-lg bg-accent px-3 py-2 font-semibold text-white">Load model</button></div><div id="progress" class="hidden mt-2.5 h-1 overflow-hidden rounded bg-stone-100"><i class="block h-full w-0 bg-accent transition-all"></i></div><div id="progressText" class="mt-1 text-xs text-stone-500"></div><div id="sumStatus" class="mt-2 text-xs text-stone-500">Summary model will download quietly when needed.</div><div id="sumProgress" class="hidden mt-2 h-1 overflow-hidden rounded bg-stone-100"><i class="block h-full w-0 bg-accent transition-all"></i></div></div>
+      </details>
+      <section id="newNoteView" class="mx-auto mt-[7vh] max-w-xl text-center md:mt-[11vh]"><div class="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-violet-100 text-3xl text-accent">✦</div><h1 class="mt-5 text-3xl font-bold tracking-tight md:text-[34px]">Start a fresh note</h1><p class="mt-2 text-stone-500">Capture a thought now or turn an existing audio file into a private note.</p><div class="mt-8 grid gap-3 text-left sm:grid-cols-2"><button id="recordStartBtn" class="min-h-32 rounded-xl border border-stone-200 bg-white p-4.5 transition hover:border-violet-300 hover:bg-violet-50"><div class="text-2xl text-accent">●</div><strong class="mt-2 block">Record audio</strong><span class="block text-sm text-stone-500">Use your microphone</span></button><button id="uploadBtn" class="min-h-32 rounded-xl border border-stone-200 bg-white p-4.5 transition hover:border-violet-300 hover:bg-violet-50"><div class="text-2xl text-accent">↑</div><strong class="mt-2 block">Upload audio</strong><span class="block text-sm text-stone-500">Choose a file to transcribe</span></button><input id="audioUpload" class="hidden" type="file" accept="audio/*,video/*"></div></section>
+      <section id="recordView" class="hidden mx-auto mt-[8vh] max-w-xl text-center"><h1 class="text-3xl font-bold tracking-tight">Recording a note</h1><div id="timer" class="mt-5 text-5xl tracking-tighter tabular-nums">00:00</div><div id="state" class="min-h-6 text-stone-500">Preparing microphone…</div><button id="recordBtn" class="my-6 h-[88px] w-[88px] rounded-full bg-accent text-3xl text-white shadow-xl shadow-violet-300/40" aria-label="Start recording">●</button><div class="text-sm text-stone-500">Tap to start, then tap again to finish</div><div id="wave" class="wave mt-4 flex h-6 items-center justify-center gap-[3px]"></div><div id="error" class="hidden mt-3 text-sm text-rose-700"></div></section>
+      <section id="editorView" class="hidden mx-auto max-w-3xl"><input id="noteTitle" class="w-full bg-transparent py-1 text-3xl font-bold tracking-tight outline-none md:text-[34px]" placeholder="Untitled note"><div id="noteMeta" class="mb-6 text-[13px] text-stone-500"></div><audio id="noteAudio" class="hidden my-2 w-full" controls></audio>
+        <div class="border-t border-stone-200 py-5"><div class="mb-2.5 flex items-center justify-between"><b class="text-[13px]">TRANSCRIPT</b><div class="flex gap-2"><button id="copyBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Copy</button><button id="downloadTxtBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Export</button></div></div><textarea id="output" class="min-h-44 w-full resize-y bg-transparent leading-7 outline-none" placeholder="Your transcript will appear here…" spellcheck="true"></textarea></div>
+        <div class="border-t border-stone-200 py-5"><div class="mb-2.5 flex items-center justify-between"><b class="text-[13px]">SUMMARY</b><div class="flex gap-2"><button id="summarizeBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Summarize</button><button id="toggleSumViewBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Edit</button></div></div><div id="summaryPreview" class="empty leading-relaxed text-stone-500">A concise summary will appear here.</div><textarea id="summaryOutput" class="hidden min-h-44 w-full resize-y bg-transparent leading-7 outline-none" placeholder="Write a summary…" spellcheck="true"></textarea><div class="mt-3 flex gap-2"><button id="copySumBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Copy summary</button><button id="downloadSumTxtBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Export MD</button><button id="deleteNoteBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-rose-700">Delete note</button></div></div>
+        <div class="flex gap-3 text-xs text-stone-500"><span>Saved locally</span><span id="storageInfo"></span></div>
+      </section>
+    </main>
+  </div>
+  <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").catch(console.warn);</script>
+  <script type="module" src="./app.js"></script>
+</body></html>

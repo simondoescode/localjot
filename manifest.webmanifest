@@ -1,11 +1,11 @@
 {
-  "name": "Local Transcriber",
-  "short_name": "Transcriber",
+  "name": "Jot — Private Voice Notes",
+  "short_name": "Jot",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#0b0d12",
-  "theme_color": "#0b0d12",
-  "description": "Private browser-based Whisper speech-to-text.",
+  "background_color": "#f7f7f5",
+  "theme_color": "#f7f7f5",
+  "description": "Private on-device voice notes and transcription.",
   "icons": [
     {
       "src": "icon.svg",
