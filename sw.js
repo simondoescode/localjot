@@ -1,4 +1,4 @@
-const CACHE = "localjot-v2";
+const CACHE = "localjot-v3";
 
 self.addEventListener("install", () => self.skipWaiting());
 
