@@ -28,11 +28,24 @@ function normalizeSpeech(samples) {
     sumSquares += sample * sample;
   }
   const rms = Math.sqrt(sumSquares / Math.max(1, samples.length));
-  if (peak < 0.005 || rms < 0.0005) return samples;
+  if (peak < 0.0000001 || rms < 0.00000001) return samples;
 
-  const gain = Math.min(8, 0.9 / peak);
+  const gain = Math.min(32, 0.9 / peak);
   if (gain <= 1.05) return samples;
   return Float32Array.from(samples, (sample) => Math.max(-1, Math.min(1, sample * gain)));
+}
+
+function ensureAudible(samples) {
+  let peak = 0;
+  let sumSquares = 0;
+  for (const sample of samples) {
+    peak = Math.max(peak, Math.abs(sample));
+    sumSquares += sample * sample;
+  }
+  if (peak < 0.0000001) {
+    const rms = Math.sqrt(sumSquares / Math.max(1, samples.length));
+    throw new Error(`No usable audio was captured (peak ${peak.toExponential(2)}, RMS ${rms.toExponential(2)}).`);
+  }
 }
 
 export function chunkAudio(samples, sampleRate = 16000, chunkSeconds = 20, overlapSeconds = 2) {
@@ -52,20 +65,36 @@ async function decodeWithMediaElement(blob) {
   const element = document.createElement("audio");
   element.src = url;
   element.preload = "auto";
-  element.muted = true;
   element.playsInline = true;
 
   const context = new AudioContext();
   const source = context.createMediaElementSource(element);
   const processor = context.createScriptProcessor(4096, 1, 1);
   const silencer = context.createGain();
-  silencer.gain.value = 0;
+  // Keep the graph active so ScriptProcessor receives frames, while making
+  // fallback playback effectively inaudible.
+  silencer.gain.value = 0.00001;
   const chunks = [];
 
   try {
     await new Promise((resolve, reject) => {
-      element.addEventListener("canplay", resolve, { once: true });
-      element.addEventListener("error", () => reject(new Error("The browser could not play this audio file.")), { once: true });
+      const timeout = setTimeout(() => reject(new Error("The browser could not load this recorded audio format.")), 8000);
+      const ready = () => {
+        clearTimeout(timeout);
+        resolve();
+      };
+      element.addEventListener("loadedmetadata", ready, { once: true });
+      element.addEventListener("loadeddata", ready, { once: true });
+      element.addEventListener("canplay", ready, { once: true });
+      element.addEventListener(
+        "error",
+        () => {
+          clearTimeout(timeout);
+          const code = element.error?.code ? ` (media error ${element.error.code})` : "";
+          reject(new Error(`The browser could not play this audio file${code}.`));
+        },
+        { once: true }
+      );
       element.load();
     });
     processor.onaudioprocess = (event) => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
@@ -102,6 +131,7 @@ async function decodeWithMediaElement(blob) {
 }
 
 async function resampleTo16k(samples, sampleRate, durationMs) {
+  ensureAudible(samples);
   if (sampleRate === 16000) return { audio: normalizeSpeech(samples), durationMs };
   const length = Math.max(1, Math.ceil((samples.length / sampleRate) * 16000));
   const offline = new OfflineAudioContext(1, length, 16000);
@@ -135,6 +165,7 @@ export async function decodeAudio(blob) {
       for (let i = 0; i < source.length; i++) mono[i] += source[i] / decoded.numberOfChannels;
     }
     if (decoded.sampleRate === 16000) {
+      ensureAudible(mono);
       return { audio: normalizeSpeech(mono), durationMs: Math.round(decoded.duration * 1000) };
     }
     return resampleTo16k(mono, decoded.sampleRate, Math.round(decoded.duration * 1000));

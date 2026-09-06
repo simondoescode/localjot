@@ -55,6 +55,7 @@ export default function App() {
   const [summaryMarkdown, setSummaryMarkdown] = useState("");
   const [showSummaryPreview, setShowSummaryPreview] = useState(true);
   const [audioUrl, setAudioUrl] = useState(null);
+  const [recordingPreview, setRecordingPreview] = useState(null);
   const [recordError, setRecordError] = useState("");
   const [processingLabel, setProcessingLabel] = useState("");
   const [isSummarizing, setIsSummarizing] = useState(false);
@@ -124,7 +125,7 @@ export default function App() {
       setRecordError("");
       if (!(await models.ensureTranscriber())) {
         setProcessingLabel("");
-        setView("new");
+        setView("record");
         setRecordError("Speech model could not be loaded. Check your connection and try again.");
         return;
       }
@@ -156,7 +157,7 @@ export default function App() {
         console.error(err);
         const detail = err instanceof Error && err.message ? ` (${err.message.slice(0, 140)})` : "";
         setRecordError(`Transcription failed${detail}`);
-        setView("new");
+        setView("record");
       } finally {
         setProcessingLabel("");
       }
@@ -170,12 +171,29 @@ export default function App() {
         setRecordError(error);
         return;
       }
+      if (recordingPreview) URL.revokeObjectURL(recordingPreview.url);
+      const url = URL.createObjectURL(result.blob);
+      setRecordingPreview({
+        url,
+        size: result.blob.size,
+        type: result.blob.type,
+        durationMs: result.durationMs,
+        peak: result.peak,
+        rms: result.rms,
+      });
       createNoteFromAudio(result.blob, result.durationMs);
     },
-    [createNoteFromAudio]
+    [createNoteFromAudio, recordingPreview]
   );
 
   const recorder = useRecorder({ onStop: handleRecorderStop });
+
+  useEffect(
+    () => () => {
+      if (recordingPreview) URL.revokeObjectURL(recordingPreview.url);
+    },
+    [recordingPreview]
+  );
 
   const newNote = useCallback(async () => {
     if (saveTimerRef.current) {
@@ -205,7 +223,10 @@ export default function App() {
   const handleToggleRecord = useCallback(async () => {
     try {
       if (recorder.micState === "recording") await recorder.stopRecording();
-      else await recorder.startRecording();
+      else if (recorder.micState === "ready") await recorder.startRecording();
+      else if (recorder.micState === "idle") {
+        if (await recorder.openMic()) await recorder.startRecording();
+      }
     } catch (err) {
       console.error(err);
       setRecordError("Could not start recording. Check that your microphone is available and try again.");
@@ -349,6 +370,7 @@ export default function App() {
               waveHeights={recorder.waveHeights}
               onToggleRecord={handleToggleRecord}
               error={recordError}
+              recordingPreview={recordingPreview}
             />
           )}
 

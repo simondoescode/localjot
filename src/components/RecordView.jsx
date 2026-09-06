@@ -14,7 +14,7 @@ const STATUS_LABEL = {
   error: "Microphone unavailable",
 };
 
-export default function RecordView({ micState, elapsedMs, waveHeights, onToggleRecord, error }) {
+export default function RecordView({ micState, elapsedMs, waveHeights, onToggleRecord, error, recordingPreview }) {
   const isRecording = micState === "recording";
 
   return (
@@ -24,7 +24,7 @@ export default function RecordView({ micState, elapsedMs, waveHeights, onToggleR
       <div className="min-h-6 text-stone-500">{STATUS_LABEL[micState]}</div>
       <button
         onClick={onToggleRecord}
-        disabled={micState === "requesting" || micState === "saving"}
+        disabled={micState !== "ready" && micState !== "recording"}
         aria-label={isRecording ? "Stop recording" : "Start recording"}
         className={`my-6 grid h-[88px] w-[88px] place-items-center rounded-full text-white shadow-xl transition disabled:opacity-60 ${
           isRecording ? "bg-rose-600 shadow-rose-300/40" : "bg-accent shadow-violet-300/40"
@@ -39,6 +39,16 @@ export default function RecordView({ micState, elapsedMs, waveHeights, onToggleR
         ))}
       </div>
       {error && <div className="mt-3 text-sm text-rose-700">{error}</div>}
+      {recordingPreview && (
+        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-stone-200 bg-white p-4 text-left shadow-sm">
+          <div className="text-sm font-semibold text-stone-800">Latest recording</div>
+          <audio className="mt-3 w-full" controls src={recordingPreview.url} />
+          <div className="mt-2 text-xs leading-5 text-stone-500">
+            {(recordingPreview.size / 1024).toFixed(1)} KB · {recordingPreview.type || "unknown format"} · peak{" "}
+            {recordingPreview.peak?.toFixed(5) || "0.00000"} · RMS {recordingPreview.rms?.toFixed(5) || "0.00000"}
+          </div>
+        </div>
+      )}
     </section>
   );
 }
