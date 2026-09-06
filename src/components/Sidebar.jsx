@@ -1,5 +1,7 @@
 import { Plus } from "lucide-react";
 
+const iconUrl = `${import.meta.env.BASE_URL}icon.svg`;
+
 function notePreview(note) {
   return (note.summaryMarkdown || note.transcript || "No transcript yet")
     .replace(/[#*_`\n-]+/g, " ")
@@ -21,7 +23,7 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, storag
   return (
     <div className="flex h-full flex-col px-3 py-4 md:px-4 md:py-6">
       <div className="flex items-center gap-2.5 px-1 pb-3 md:px-2 md:pb-6">
-        <img className="h-8 w-8" src="/icon.svg" alt="" />
+        <img className="h-8 w-8" src={iconUrl} alt="" />
         <div>
           <b className="text-lg tracking-tight">Jot</b>
           <span className="block text-xs text-stone-500">Private voice notes</span>
