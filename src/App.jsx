@@ -102,10 +102,15 @@ export default function App() {
 
   const createNoteFromAudio = useCallback(
     async (blob, recordedDurationMs = 0, suppliedTitle = "") => {
-      if (!(await models.ensureTranscriber())) return;
       setView("record");
       setProcessingLabel("Transcribing locally");
       setRecordError("");
+      if (!(await models.ensureTranscriber())) {
+        setProcessingLabel("");
+        setView("new");
+        setRecordError("Speech model could not be loaded. Check your connection and try again.");
+        return;
+      }
       try {
         const { audio, durationMs } = await decodeAudio(blob);
         const result = await models.transcriberRef.current(audio, {
@@ -174,14 +179,19 @@ export default function App() {
     await recorder.openMic();
   }, [models, recorder]);
 
-  const handleToggleRecord = useCallback(() => {
-    if (recorder.micState === "recording") recorder.stopRecording();
-    else recorder.startRecording();
+  const handleToggleRecord = useCallback(async () => {
+    try {
+      if (recorder.micState === "recording") await recorder.stopRecording();
+      else await recorder.startRecording();
+    } catch (err) {
+      console.error(err);
+      setRecordError("Could not start recording. Check that your microphone is available and try again.");
+    }
   }, [recorder]);
 
   const handleFileChange = useCallback(
     async (e) => {
-      const file = e.target.files[0];
+      const file = e.currentTarget.files?.[0];
       e.target.value = "";
       if (file) await createNoteFromAudio(file, 0, file.name.replace(/\.[^/.]+$/, ""));
     },
@@ -240,7 +250,7 @@ export default function App() {
   return (
     <div className="min-h-dvh bg-paper text-ink">
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-stone-200 bg-paper/95 px-2 py-2 backdrop-blur [padding-top:env(safe-area-inset-top)] md:hidden">
+      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-stone-200/80 bg-paper/90 px-2 py-2 backdrop-blur-xl [padding-top:env(safe-area-inset-top)] md:hidden">
         <button
           onClick={() => setDrawerOpen(true)}
           aria-label="Open notes"
@@ -260,15 +270,15 @@ export default function App() {
 
       <div className="md:grid md:min-h-dvh md:grid-cols-[292px_minmax(0,1fr)]">
         {/* Desktop sidebar */}
-        <aside className="hidden border-r border-stone-200 bg-stone-50 md:flex md:min-h-dvh md:flex-col">
+        <aside className="hidden border-r border-stone-200/80 bg-stone-100/60 md:flex md:min-h-dvh md:flex-col">
           <Sidebar notes={notes} selectedId={selectedNote?.id} onSelect={openNote} onNewNote={newNote} storage={storage} />
         </aside>
 
         {/* Mobile drawer */}
         {drawerOpen && (
           <div className="fixed inset-0 z-40 md:hidden">
-            <div className="absolute inset-0 bg-black/40" onClick={() => setDrawerOpen(false)} />
-            <div className="absolute inset-y-0 left-0 flex w-[85vw] max-w-80 flex-col bg-stone-50 shadow-xl [padding-top:env(safe-area-inset-top)]">
+            <div className="absolute inset-0 bg-stone-950/30 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
+            <div className="absolute inset-y-0 left-0 flex w-[85vw] max-w-80 flex-col bg-stone-50 shadow-2xl [padding-top:env(safe-area-inset-top)]">
               <div className="flex justify-end px-2 pt-2">
                 <button
                   onClick={() => setDrawerOpen(false)}
@@ -287,7 +297,7 @@ export default function App() {
 
         <main className="w-full max-w-5xl px-4 py-4 md:px-[7vw] md:py-7">
           {processingLabel && (
-            <div className="mb-3 w-fit rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-medium text-violet-700">
+            <div className="mb-3 w-fit rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 shadow-sm">
               {processingLabel}
             </div>
           )}
@@ -350,7 +360,14 @@ export default function App() {
             />
           )}
 
-          <input ref={fileInputRef} type="file" accept="audio/*,video/*" className="hidden" onChange={handleFileChange} />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*,video/*"
+            aria-label="Choose an audio file"
+            className="sr-only"
+            onChange={handleFileChange}
+          />
         </main>
       </div>
     </div>

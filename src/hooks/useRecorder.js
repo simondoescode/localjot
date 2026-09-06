@@ -41,7 +41,7 @@ export function useRecorder({ onStop }) {
     rafRef.current = requestAnimationFrame(animateWave);
   }, []);
 
-  const startRecording = useCallback(() => {
+  const startRecording = useCallback(async () => {
     if (!streamRef.current || recordingRef.current) return;
     const context = new AudioContext();
     const source = context.createMediaStreamSource(streamRef.current);
@@ -53,7 +53,11 @@ export function useRecorder({ onStop }) {
     source.connect(processor);
     processor.connect(silencer);
     silencer.connect(context.destination);
-    context.resume();
+    await context.resume();
+    if (context.state !== "running") {
+      await context.close();
+      throw new Error("The audio context could not be started.");
+    }
     contextRef.current = context;
     sourceRef.current = source;
     processorRef.current = processor;

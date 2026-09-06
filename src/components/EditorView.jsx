@@ -31,15 +31,15 @@ export default function EditorView({
       <input
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
-        className="w-full bg-transparent py-1 text-3xl font-bold tracking-tight outline-none md:text-[34px]"
+        className="w-full bg-transparent py-1 text-3xl font-bold tracking-tight outline-none placeholder:text-stone-300 md:text-[34px]"
         placeholder="Untitled note"
       />
       <div className="mb-6 text-[13px] text-stone-500">
         {new Date(note.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} · {fmt(note.durationMs || 0)}
       </div>
-      {audioUrl && <audio className="my-2 w-full" controls src={audioUrl} />}
+      {audioUrl && <audio className="my-3 w-full rounded-xl shadow-sm" controls src={audioUrl} />}
 
-      <div className="border-t border-stone-200 py-5">
+      <div className="border-t border-stone-200/80 py-5">
         <div className="mb-2.5 flex items-center justify-between">
           <b className="text-[13px]">TRANSCRIPT</b>
           <div className="flex gap-2">
@@ -68,14 +68,14 @@ export default function EditorView({
         />
       </div>
 
-      <div className="border-t border-stone-200 py-5">
+      <div className="border-t border-stone-200/80 py-5">
         <div className="mb-2.5 flex items-center justify-between">
           <b className="text-[13px]">SUMMARY</b>
           <div className="flex gap-2">
             <button
               onClick={onSummarize}
               disabled={isSummarizing}
-              className="flex min-h-9 items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium disabled:opacity-60"
+              className="flex min-h-9 items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-medium shadow-sm hover:border-violet-200 hover:bg-violet-50 disabled:opacity-60"
             >
               <Sparkles size={14} /> {isSummarizing ? "Summarizing…" : "Summarize"}
             </button>

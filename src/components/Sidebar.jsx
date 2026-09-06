@@ -30,7 +30,7 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, storag
 
       <button
         onClick={onNewNote}
-        className="flex min-h-11 w-full items-center gap-1.5 rounded-xl bg-ink px-3.5 py-3 text-left font-semibold text-white transition hover:bg-stone-700 active:bg-stone-800"
+        className="flex min-h-11 w-full items-center gap-1.5 rounded-xl bg-ink px-3.5 py-3 text-left font-semibold text-white shadow-sm shadow-stone-900/10 transition hover:-translate-y-0.5 hover:bg-stone-700 hover:shadow-md active:bg-stone-800"
       >
         <Plus size={18} /> New note
       </button>
@@ -46,8 +46,8 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, storag
           <button
             key={note.id}
             onClick={() => onSelect(note)}
-            className={`w-full rounded-[.625rem] p-2.5 text-left transition hover:bg-stone-100 active:bg-stone-200 ${
-              note.id === selectedId ? "bg-violet-50" : ""
+            className={`w-full rounded-xl border p-2.5 text-left transition hover:border-stone-300 hover:bg-white active:bg-stone-100 ${
+            note.id === selectedId ? "border-violet-200 bg-violet-50 shadow-sm" : "border-transparent"
             }`}
           >
             <b className="block truncate text-sm">{noteTitle(note)}</b>

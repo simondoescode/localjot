@@ -1,7 +1,15 @@
-import { pipeline, env } from "@huggingface/transformers";
+let transformersPromise;
 
-env.allowRemoteModels = true;
-env.allowLocalModels = false;
+async function getTransformers() {
+  if (!transformersPromise) {
+    transformersPromise = import("@huggingface/transformers").then((module) => {
+      module.env.allowRemoteModels = true;
+      module.env.allowLocalModels = false;
+      return module;
+    });
+  }
+  return transformersPromise;
+}
 
 export function isMobileDevice() {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || matchMedia("(pointer:coarse)").matches;
@@ -32,6 +40,7 @@ export async function releaseModel(ref) {
 }
 
 export async function loadTranscriber(modelId, onProgress) {
+  const { pipeline } = await getTransformers();
   const device = await pickDevice();
   return pipeline("automatic-speech-recognition", modelId, {
     device,
@@ -41,6 +50,7 @@ export async function loadTranscriber(modelId, onProgress) {
 }
 
 export async function loadSummarizer(onProgress) {
+  const { pipeline } = await getTransformers();
   const device = await pickDevice();
   return pipeline("summarization", "Xenova/distilbart-cnn-6-6", {
     device,

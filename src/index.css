@@ -10,7 +10,47 @@ body,
 
 body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: #fafaf9;
+  color: #18181b;
   -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: #ddd6fe;
+  color: #312e81;
+}
+
+button,
+select,
+audio {
+  -webkit-appearance: none;
+}
+
+button {
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+summary:focus-visible {
+  outline: 2px solid #a78bfa;
+  outline-offset: 3px;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d6d3d1;
+  border: 2px solid #fafaf9;
+  border-radius: 999px;
 }
 
 /* iOS Safari zooms the page in when a focused form control has a font-size

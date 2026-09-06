@@ -1,14 +1,14 @@
 export default function ModelSettings({ open, onToggle, modelId, onModelChange, onLoadModel, transcriberStatus, summarizerStatus }) {
   return (
-    <details open={open} onToggle={(e) => onToggle(e.target.open)} className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
-      <summary className="cursor-pointer text-[13px] text-stone-500">Speech model &amp; local processing</summary>
+    <details open={open} onToggle={(e) => onToggle(e.target.open)} className="mb-4 rounded-2xl border border-stone-200/80 bg-white/80 p-3.5 shadow-sm shadow-stone-900/[0.03]">
+      <summary className="cursor-pointer text-[13px] font-medium text-stone-600">Speech model &amp; local processing</summary>
       <div className="pt-3.5">
         <div className="flex flex-wrap gap-2.5">
           <select
             value={modelId}
             onChange={(e) => onModelChange(e.target.value)}
             disabled={transcriberStatus.state === "loading"}
-            className="min-h-11 min-w-40 flex-1 rounded-lg border border-stone-200 bg-white px-2 py-2 text-base"
+            className="min-h-11 min-w-40 flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-base shadow-sm"
           >
             <option value="Xenova/whisper-tiny.en">Tiny English — fast</option>
             <option value="Xenova/whisper-base.en">Base English — more accurate</option>
@@ -16,7 +16,7 @@ export default function ModelSettings({ open, onToggle, modelId, onModelChange, 
           <button
             onClick={onLoadModel}
             disabled={transcriberStatus.state === "loading"}
-            className="min-h-11 rounded-lg bg-accent px-3 py-2 font-semibold text-white disabled:opacity-60"
+            className="min-h-11 rounded-xl bg-accent px-3 py-2 font-semibold text-white shadow-sm shadow-violet-500/20 hover:bg-violet-600 hover:shadow-md disabled:opacity-60"
           >
             {transcriberStatus.state === "ready" ? "Model ready" : "Load model"}
           </button>
