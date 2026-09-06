@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f7f7f5">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <title>Jot — private voice notes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { theme: { extend: { colors: { paper:"#f7f7f5", ink:"#1c1c1a", accent:"#6257e8" } } } }
+  </script>
+  <style>
+    .note-item{width:100%;border-radius:.625rem;padding:.7rem;text-align:left}.note-item:hover{background:#f0f0eb}.note-item.active{background:#eeecff}.note-item b,.note-item span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.note-item b{font-size:.875rem}.note-item span{margin-top:.125rem;font-size:.75rem;color:#777771}.note-item small{display:block;margin-top:.3rem;font-size:.6875rem;color:#777771}.wave i{height:4px;width:3px;border-radius:99px;background:#aaa5ef;transition:height .08s}
+  </style>
+</head>
+<body class="min-h-screen bg-paper font-sans text-ink">
+  <span class="hidden !bg-rose-600 shadow-rose-300/40"></span>
+  <div class="grid min-h-screen md:grid-cols-[292px_minmax(0,1fr)]">
+    <aside class="flex min-h-auto flex-col border-b border-stone-200 bg-stone-50 px-3 py-4 md:min-h-screen md:border-b-0 md:border-r md:px-4 md:py-6">
+      <div class="flex items-center gap-2.5 px-1 pb-3 md:px-2 md:pb-6">
+        <img class="h-8 w-8" src="./icon.svg" alt=""><div><b class="text-lg tracking-tight">Jot</b><span class="block text-xs text-stone-500">Private voice notes</span></div>
+      </div>
+      <button id="newNoteBtn" class="w-full rounded-xl bg-ink px-3.5 py-3 text-left font-semibold text-white transition hover:bg-stone-700"><span class="mr-1 text-lg">＋</span> New note</button>
+      <div class="flex justify-between px-1 pt-4 pb-2 text-[11px] font-bold uppercase tracking-widest text-stone-500 md:px-2 md:pt-6"><span>Notes</span><span id="noteCount">0</span></div>
+      <div id="historyList" class="flex max-h-40 flex-col gap-1 overflow-auto md:max-h-none md:flex-1"><div id="historyEmpty" class="p-2 text-xs text-stone-500">No notes yet</div></div>
+      <div class="mt-auto hidden border-t border-stone-200 px-2 pt-4 text-xs text-stone-500 md:block"><div class="font-medium text-stone-700">On-device storage</div><div id="diskUsage" class="mt-1">Checking storage…</div><div class="mt-2 h-1.5 overflow-hidden rounded-full bg-stone-200"><i id="diskUsageBar" class="block h-full w-0 rounded-full bg-accent transition-all"></i></div><div id="diskRemaining" class="mt-1">Nothing leaves this device</div></div>
+    </aside>
+    <main class="w-full max-w-5xl px-5 py-5 md:px-[7vw] md:py-7">
+      <div id="processingStatus" class="hidden mb-3 w-fit rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-medium text-violet-700"></div>
+      <div class="mb-7 flex items-center justify-between md:mb-11"><span class="text-[13px] text-stone-500">Private · on-device transcription</span><button id="settingsBtn" class="grid h-9 w-9 place-items-center rounded-lg border border-stone-200 bg-white text-lg hover:bg-stone-50" aria-label="Model settings">⚙</button></div>
+      <details id="modelCard" class="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
+        <summary class="cursor-pointer text-[13px] text-stone-500">Speech model &amp; local processing</summary>
+        <div class="pt-3.5"><div class="flex flex-wrap gap-2.5"><select id="modelSelect" class="min-w-40 flex-1 rounded-lg border border-stone-200 bg-white px-2 py-2"><option value="Xenova/whisper-tiny.en">Tiny English — fast</option><option value="Xenova/whisper-base.en">Base English — more accurate</option></select><button id="loadBtn" class="rounded-lg bg-accent px-3 py-2 font-semibold text-white">Load model</button></div><div id="progress" class="hidden mt-2.5 h-1 overflow-hidden rounded bg-stone-100"><i class="block h-full w-0 bg-accent transition-all"></i></div><div id="progressText" class="mt-1 text-xs text-stone-500"></div><div id="sumStatus" class="mt-2 text-xs text-stone-500">Summary model will download quietly when needed.</div><div id="sumProgress" class="hidden mt-2 h-1 overflow-hidden rounded bg-stone-100"><i class="block h-full w-0 bg-accent transition-all"></i></div></div>
+      </details>
+      <section id="newNoteView" class="mx-auto mt-[7vh] max-w-xl text-center md:mt-[11vh]"><div class="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-violet-100 text-3xl text-accent">✦</div><h1 class="mt-5 text-3xl font-bold tracking-tight md:text-[34px]">Start a fresh note</h1><p class="mt-2 text-stone-500">Capture a thought now or turn an existing audio file into a private note.</p><div class="mt-8 grid gap-3 text-left sm:grid-cols-2"><button id="recordStartBtn" class="min-h-32 rounded-xl border border-stone-200 bg-white p-4.5 transition hover:border-violet-300 hover:bg-violet-50"><div class="text-2xl text-accent">●</div><strong class="mt-2 block">Record audio</strong><span class="block text-sm text-stone-500">Use your microphone</span></button><button id="uploadBtn" class="min-h-32 rounded-xl border border-stone-200 bg-white p-4.5 transition hover:border-violet-300 hover:bg-violet-50"><div class="text-2xl text-accent">↑</div><strong class="mt-2 block">Upload audio</strong><span class="block text-sm text-stone-500">Choose a file to transcribe</span></button><input id="audioUpload" class="hidden" type="file" accept="audio/*,video/*"></div></section>
+      <section id="recordView" class="hidden mx-auto mt-[8vh] max-w-xl text-center"><h1 class="text-3xl font-bold tracking-tight">Recording a note</h1><div id="timer" class="mt-5 text-5xl tracking-tighter tabular-nums">00:00</div><div id="state" class="min-h-6 text-stone-500">Preparing microphone…</div><button id="recordBtn" class="my-6 h-[88px] w-[88px] rounded-full bg-accent text-3xl text-white shadow-xl shadow-violet-300/40" aria-label="Start recording">●</button><div class="text-sm text-stone-500">Tap to start, then tap again to finish</div><div id="wave" class="wave mt-4 flex h-6 items-center justify-center gap-[3px]"></div><div id="error" class="hidden mt-3 text-sm text-rose-700"></div></section>
+      <section id="editorView" class="hidden mx-auto max-w-3xl"><input id="noteTitle" class="w-full bg-transparent py-1 text-3xl font-bold tracking-tight outline-none md:text-[34px]" placeholder="Untitled note"><div id="noteMeta" class="mb-6 text-[13px] text-stone-500"></div><audio id="noteAudio" class="hidden my-2 w-full" controls></audio>
+        <div class="border-t border-stone-200 py-5"><div class="mb-2.5 flex items-center justify-between"><b class="text-[13px]">TRANSCRIPT</b><div class="flex gap-2"><button id="copyBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Copy</button><button id="downloadTxtBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Export</button></div></div><textarea id="output" class="min-h-44 w-full resize-y bg-transparent leading-7 outline-none" placeholder="Your transcript will appear here…" spellcheck="true"></textarea></div>
+        <div class="border-t border-stone-200 py-5"><div class="mb-2.5 flex items-center justify-between"><b class="text-[13px]">SUMMARY</b><div class="flex gap-2"><button id="summarizeBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Summarize</button><button id="toggleSumViewBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Edit</button></div></div><div id="summaryPreview" class="empty leading-relaxed text-stone-500">A concise summary will appear here.</div><textarea id="summaryOutput" class="hidden min-h-44 w-full resize-y bg-transparent leading-7 outline-none" placeholder="Write a summary…" spellcheck="true"></textarea><div class="mt-3 flex gap-2"><button id="copySumBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Copy summary</button><button id="downloadSumTxtBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs">Export MD</button><button id="deleteNoteBtn" class="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-rose-700">Delete note</button></div></div>
+        <div class="flex gap-3 text-xs text-stone-500"><span>Saved locally</span><span id="storageInfo"></span></div>
+      </section>
+    </main>
+  </div>
+  <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("./sw.js").then(registration=>registration.update()).catch(console.warn);</script>
+  <script type="module" src="./app.js"></script>
+</body></html>

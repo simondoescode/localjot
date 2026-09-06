@@ -1,0 +1,17 @@
+{
+  "name": "Jot — Private Voice Notes",
+  "short_name": "Jot",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f7f5",
+  "theme_color": "#f7f7f5",
+  "description": "Private on-device voice notes and transcription.",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

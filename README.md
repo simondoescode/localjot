@@ -1,68 +1,71 @@
-# Local Transcriber — browser-only Whisper PWA
+# Jot (React + Tailwind rewrite)
 
-A mobile-first speech-to-text PWA using Whisper through Transformers.js.
+Private, on-device voice notes: record or upload audio, transcribe it locally
+with Whisper (via [Transformers.js](https://github.com/huggingface/transformers.js)),
+and optionally summarize the transcript — all in the browser, nothing leaves
+the device.
 
-## Privacy model
+This is a React + Tailwind rewrite of the original vanilla-JS app, with the
+same brand (paper/ink/violet-accent) and the same on-device model logic, but
+restructured into components/hooks and reworked for a much better mobile
+experience.
 
-- Audio is recorded with the browser microphone.
-- Audio is decoded and sent directly to the local Whisper model running in the browser.
-- Transcripts are summarized by a second small model (DistilBART CNN via Transformers.js) that also runs entirely in the browser — the transcript text never leaves the device.
-- Past recordings (audio + transcript + summary) are saved to this browser's IndexedDB storage for this site only — not to a server, not to the cloud.
-- There is no transcription API, summarization API, or application backend.
-- After the models have been downloaded/cached, the app can be used offline (subject to browser cache/model availability).
+## Run it
 
-## Recording history
+```
+npm install
+npm run dev
+```
 
-- Every finished recording is saved locally (IndexedDB) with its audio, transcript, and (once run) its summary.
-- The History card lists past recordings newest-first, with playback, per-recording Summarize/Re-summarize, and delete.
-- "Clear all" wipes every saved recording from this device after confirmation.
-- This history is tied to the browser/device it was recorded on — clearing site data or using a different browser/device won't show it.
+Build for deployment:
 
-## Summarization
+```
+npm run build
+npm run preview   # sanity-check the production build locally
+```
 
-- A small summarization model (`Xenova/distilbart-cnn-6-6`, quantized) starts downloading automatically in the background as soon as the app opens — no button press required.
-- Progress is shown quietly in the "Summary" card; the rest of the app (recording, transcribing) is not blocked while it downloads.
-- If you tap "Summarize" before the download finishes, the app queues the request and runs it automatically the moment the model is ready.
-- Long transcripts are split into chunks locally before summarizing, since on-device models have a bounded input length; the chunk summaries are then joined.
-- Like Whisper, the model is cached by the browser after first download, so later summaries can run offline too.
+## What's different from the vanilla version
 
-## Important first-run note
+**Structure** — split into `lib/` (DB, audio encode/decode, model loading,
+chunked summarization), `hooks/` (`useNotes`, `useModels`, `useRecorder`,
+`useStorageInfo`), and `components/` (`Sidebar`, `ModelSettings`,
+`NewNoteView`, `RecordView`, `EditorView`). `App.jsx` wires it all together.
 
-The app imports Transformers.js from jsDelivr and downloads the selected Whisper model, plus the summarization model, from Hugging Face on first use. This is required for the browser-only starter build.
+**Mobile styling:**
+- Real navigation instead of a squashed inline notes strip: a hamburger menu
+  opens a slide-in drawer with the notes list and storage panel, closing on
+  selection or backdrop tap.
+- A sticky bottom action bar (Copy / Export / Delete) sits within thumb's
+  reach in the editor on small screens, padded for the iOS home indicator via
+  `env(safe-area-inset-bottom)`.
+- `min-h-dvh` instead of `min-h-screen`, so the layout doesn't jump when
+  mobile browser chrome (URL bar) shows/hides.
+- All inputs/textareas/selects are forced to 16px+ so iOS Safari doesn't
+  zoom in on focus.
+- Touch targets are sized to at least 44×44px (`min-h-11`/`min-w-11`)
+  throughout.
+- Icons (via `lucide-react`) instead of ASCII glyphs for clearer, more
+  consistent touch targets.
 
-If you want a *fully self-contained* offline package with no CDN/model host dependency at all, download/vendor the Transformers.js runtime and model files into the project and change `env.allowLocalModels` plus the model path in `app.js`.
+**Everything else is unchanged in behavior** from the last vanilla-JS
+version: WebGPU is only used after actually confirming an adapter (and never
+on mobile, where GPU-driver crashes were the original bug report), the
+transcriber model is freed from memory before the summarizer downloads on
+mobile to avoid an out-of-memory tab kill, and long transcripts are
+summarized in sentence-aware chunks rather than hard-truncated.
 
-## Run on your phone
+## Service worker note
 
-Microphone access normally requires a secure context (HTTPS). The easiest test:
+`public/sw.js` does runtime (network-first, cache-fallback) caching of
+same-origin requests, same strategy as the original. It does **not**
+precache a build-time asset list, because Vite hashes output filenames per
+build — for a fully offline-capable first load, add
+[`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/), which generates that
+manifest automatically. As shipped, the app becomes available offline after
+the first successful visit.
 
-1. Put this folder on any static HTTPS host, or run a local HTTPS development server accessible from your phone.
-2. Open the HTTPS URL in Chrome/Edge on Android (or Safari on iPhone).
-3. Add it to the home screen.
-4. Choose Tiny English for the first test.
-5. Tap "Download / load Whisper model".
-6. Allow microphone access.
-7. Record and stop.
+## Model weights
 
-For Android Chrome, WebGPU availability varies by device/browser. If WebGPU is unavailable, the app falls back to WASM.
-
-## Files
-
-- `index.html` — mobile-first UI
-- `app.js` — microphone, audio decoding/resampling and Whisper inference
-- `sw.js` — PWA app-shell caching
-- `manifest.webmanifest` — installable PWA metadata
-- `icon.svg` — app icon
-
-## Recommended next upgrades
-
-- Fully vendor Transformers.js and model assets for strict air-gapped operation
-- Add multilingual Whisper
-- Add audio-file import
-- Add transcript history using IndexedDB
-- Add SRT/VTT timestamp export
-- Add wake/keep-screen-awake support
-- Add model management and storage usage UI
-- Offer a summary length/style choice (bullet points vs. paragraph)
-- Cache the summarization model choice so users can pick a larger/more accurate model on capable devices
-- Add search/filter within recording history, and a storage-usage indicator
+The Whisper and summarization model weights are downloaded from the Hugging
+Face CDN on first use and cached by the browser/onnxruntime-web's own
+storage layer — they are not bundled with this project.

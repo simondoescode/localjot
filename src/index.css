@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* iOS Safari zooms the page in when a focused form control has a font-size
+   below 16px. Every input/textarea/select in this app should be 16px+
+   (Tailwind's text-base), but this is a hard backstop. */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+/* Larger, more forgiving touch targets everywhere a button doesn't already
+   set an explicit size. */
+button {
+  touch-action: manipulation;
+}
