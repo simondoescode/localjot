@@ -173,3 +173,11 @@ export async function decodeAudio(blob) {
     await ctx.close();
   }
 }
+
+export async function convertAudioToWav(blob) {
+  const decoded = await decodeAudio(blob);
+  return {
+    blob: makeWav(decoded.audio, 16000),
+    durationMs: decoded.durationMs,
+  };
+}

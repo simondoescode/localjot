@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
-import { Menu, X, Settings } from "lucide-react";
-import { AppBar, Box, CssBaseline, Drawer, IconButton, ThemeProvider, Toolbar, Typography, Chip } from "@mui/material";
+import { Menu, Settings, Square } from "lucide-react";
+import { AppBar, Box, Button, CssBaseline, Drawer, IconButton, LinearProgress, ThemeProvider, Toolbar, Typography, Chip, CircularProgress, Paper, Stack } from "@mui/material";
 import { createTheme } from "@mui/material/styles";
 import Sidebar from "./components/Sidebar.jsx";
 import ModelSettings from "./components/ModelSettings.jsx";
@@ -13,17 +13,18 @@ import { useNotes } from "./hooks/useNotes.js";
 import { useModels } from "./hooks/useModels.js";
 import { useRecorder } from "./hooks/useRecorder.js";
 import { useStorageInfo } from "./hooks/useStorageInfo.js";
-import { chunkAudio, decodeAudio } from "./lib/audio.js";
+import { chunkAudio, convertAudioToWav, decodeAudio } from "./lib/audio.js";
 import { summarizeTranscript } from "./lib/summarize.js";
 
 marked.setOptions({ breaks: true });
 
 const theme = createTheme({
-  palette: { mode: "light", primary: { main: "#292524" }, secondary: { main: "#6d5bd0", light: "#f0edff" }, background: { default: "#fafaf9", paper: "#ffffff" } },
-  typography: { fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif', button: { textTransform: "none", fontWeight: 600 } },
-  shape: { borderRadius: 10 },
+  palette: { mode: "light", primary: { main: "#292524" }, secondary: { main: "#6d5bd0", light: "#f0edff" }, background: { default: "#f7f7fb", paper: "#ffffff" }, divider: "#e8e7ef" },
+  typography: { fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif', button: { textTransform: "none", fontWeight: 650 }, h3: { fontWeight: 800 } },
+  shape: { borderRadius: 14 },
   components: {
     MuiButton: { defaultProps: { disableElevation: true } },
+    MuiIconButton: { styleOverrides: { root: { "&:focus-visible": { outline: "3px solid #8b5cf6", outlineOffset: 2 } } } },
     MuiCard: { styleOverrides: { root: { boxShadow: "none", borderColor: "#e7e5e4" } } },
     MuiPaper: { styleOverrides: { outlined: { borderColor: "#e7e5e4" } } },
   },
@@ -59,6 +60,7 @@ export default function App() {
   const storage = useStorageInfo();
   const [modelId, setModelId] = useState("Xenova/whisper-tiny.en");
   const [summarizerModelId, setSummarizerModelId] = useState("Xenova/distilbart-cnn-6-6");
+  const [speakerLabels, setSpeakerLabels] = useState(() => localStorage.getItem("localjot-speaker-labels") === "true");
   const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
   const models = useModels(modelId, summarizerModelId);
 
@@ -73,6 +75,7 @@ export default function App() {
   const [recordingPreview, setRecordingPreview] = useState(null);
   const [recordError, setRecordError] = useState("");
   const [processingLabel, setProcessingLabel] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryProgress, setSummaryProgress] = useState(null);
   const [setupOpen, setSetupOpen] = useState(() => localStorage.getItem("localjot-setup-complete") !== "true");
@@ -81,6 +84,7 @@ export default function App() {
   const fileInputRef = useRef(null);
   const currentAudioUrlRef = useRef(null);
   const selectedNoteRef = useRef(null);
+  const processingCancelledRef = useRef(false);
   selectedNoteRef.current = selectedNote;
 
   const summaryHtml = useMemo(() => (summaryMarkdown.trim() ? marked.parse(summaryMarkdown) : ""), [summaryMarkdown]);
@@ -136,6 +140,7 @@ export default function App() {
 
   const createNoteFromAudio = useCallback(
     async (blob, recordedDurationMs = 0, suppliedTitle = "") => {
+      processingCancelledRef.current = false;
       setView("record");
       setProcessingLabel("Transcribing locally");
       setRecordError("");
@@ -145,17 +150,20 @@ export default function App() {
         setRecordError("Speech model could not be loaded. Check your connection and try again.");
         return;
       }
+      if (processingCancelledRef.current) return;
       try {
         const { audio, durationMs } = await decodeAudio(blob);
         const audioChunks = chunkAudio(audio);
         let text = "";
         for (let index = 0; index < audioChunks.length; index += 1) {
+          if (processingCancelledRef.current) return;
           setProcessingLabel(`Transcribing part ${index + 1} of ${audioChunks.length}`);
           const result = await models.transcriberRef.current(audioChunks[index], {
             return_timestamps: false,
           });
           text = mergeTranscript(text, result?.text || "");
         }
+        if (processingCancelledRef.current) return;
         const note = {
           id: safeId(),
           createdAt: Date.now(),
@@ -170,6 +178,7 @@ export default function App() {
         await saveNote(note);
         await openNote(note);
       } catch (err) {
+        if (processingCancelledRef.current) return;
         console.error(err);
         const detail = err instanceof Error && err.message ? ` (${err.message.slice(0, 140)})` : "";
         setRecordError(`Transcription failed${detail}`);
@@ -180,6 +189,40 @@ export default function App() {
     },
     [models, modelId, saveNote, openNote]
   );
+
+  const redoTranscript = useCallback(async (enabled = speakerLabels) => {
+    const note = selectedNoteRef.current;
+    processingCancelledRef.current = false;
+    if (!note?.audioBlob || !(await models.ensureTranscriber())) return;
+    setRecordError("");
+    setProcessingLabel("Redoing transcript locally");
+    try {
+      const { audio } = await decodeAudio(note.audioBlob);
+      let text = "";
+      for (const chunk of chunkAudio(audio)) {
+        if (processingCancelledRef.current) return;
+        const result = await models.transcriberRef.current(chunk, { return_timestamps: false });
+        text = mergeTranscript(text, result?.text || "");
+      }
+      if (processingCancelledRef.current) return;
+      const updated = { ...note, transcript: text, updatedAt: Date.now(), speakerLabels: enabled };
+      setTranscript(text);
+      setSelectedNote(updated);
+      await saveNote(updated);
+    } catch (err) {
+      if (processingCancelledRef.current) return;
+      console.error(err);
+      setRecordError("Could not redo the transcript. Try again.");
+    } finally {
+      setProcessingLabel("");
+    }
+  }, [models, saveNote, speakerLabels]);
+
+  const cancelProcessing = useCallback(() => {
+    processingCancelledRef.current = true;
+    setProcessingLabel("");
+    setRecordError("Processing stopped.");
+  }, []);
 
   const handleRecorderStop = useCallback(
     (result, error) => {
@@ -225,6 +268,7 @@ export default function App() {
     }
     if (recorder.micState === "recording") await recorder.stopRecording();
     setSelectedNote(null);
+    setSelectedFile(null);
     setView("new");
     setDrawerOpen(false);
   }, [persistCurrent, recorder]);
@@ -259,7 +303,28 @@ export default function App() {
     async (e) => {
       const file = e.currentTarget.files?.[0];
       e.target.value = "";
-      if (file) await createNoteFromAudio(file, 0, file.name.replace(/\.[^/.]+$/, ""));
+      if (!file) return;
+      setSelectedFile({ name: file.name, size: file.size, type: file.type || "audio" });
+      const isMp3 = file.type === "audio/mpeg" || /\.mp3$/i.test(file.name);
+      if (!isMp3) {
+        await createNoteFromAudio(file, 0, file.name.replace(/\.[^/.]+$/, ""));
+        return;
+      }
+      setRecordError("");
+      setProcessingLabel("Converting MP3 to WAV");
+      try {
+        const converted = await convertAudioToWav(file);
+        if (processingCancelledRef.current) {
+          setProcessingLabel("");
+          return;
+        }
+        await createNoteFromAudio(converted.blob, converted.durationMs, file.name.replace(/\.[^/.]+$/, ""));
+      } catch (err) {
+        if (processingCancelledRef.current) return;
+        console.error(err);
+        setRecordError("Could not convert this MP3 file to WAV. Try another audio file.");
+        setProcessingLabel("");
+      }
     },
     [createNoteFromAudio]
   );
@@ -331,17 +396,17 @@ export default function App() {
   }, [deleteNote]);
 
   return (
-    <ThemeProvider theme={theme}><CssBaseline /><SetupWizard open={setupOpen} onComplete={completeSetup} onRequestMic={recorder.openMic} onLoadModels={(speechId, summaryId) => models.ensureTranscriber(speechId).then((loaded) => loaded && models.ensureSummarizer(summaryId))} onModelChange={setModelId} speechModelId={modelId} summaryModelId={summarizerModelId} onSummaryModelChange={setSummarizerModelId} micReady={recorder.micState === "ready"} modelStatus={models.transcriberStatus} summaryStatus={models.summarizerStatus} /><Box sx={{ minHeight: "100dvh", bgcolor: "background.default", color: "text.primary" }}>
+    <ThemeProvider theme={theme}><CssBaseline /><SetupWizard open={setupOpen} onComplete={completeSetup} onRequestMic={recorder.openMic} onLoadModels={(speechId, summaryId) => models.ensureTranscriber(speechId).then((loaded) => loaded && models.ensureSummarizer(summaryId))} onModelChange={setModelId} speechModelId={modelId} summaryModelId={summarizerModelId} onSummaryModelChange={setSummarizerModelId} micReady={recorder.micState === "ready"} modelStatus={models.transcriberStatus} summaryStatus={models.summarizerStatus} />    <Box sx={{ minHeight: "100dvh", bgcolor: "background.default", color: "text.primary", backgroundImage: "radial-gradient(circle at 88% 0%, rgba(196,181,253,.18), transparent 28rem)" }}>
       {/* Mobile top bar */}
-      <AppBar position="sticky" color="inherit" elevation={0} sx={{ display: { xs: "block", md: "none" }, borderBottom: 1, borderColor: "divider", bgcolor: "rgba(250,250,249,.9)", backdropFilter: "blur(16px)" }}>
-        <Toolbar sx={{ justifyContent: "space-between", minHeight: 56 }}>
+      <AppBar position="sticky" color="inherit" elevation={0} sx={{ display: { xs: "block", md: "none" }, borderBottom: 1, borderColor: "rgba(232,231,239,.9)", bgcolor: "rgba(250,250,252,.82)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" }}>
+        <Toolbar sx={{ justifyContent: "space-between", minHeight: 60, px: 1.25, paddingTop: "env(safe-area-inset-top)" }}>
         <IconButton
           onClick={() => setDrawerOpen(true)}
           aria-label="Open notes"
           size="large">
           <Menu size={20} />
         </IconButton>
-        <Typography fontWeight={800}>LocalJot</Typography>
+        <Typography fontWeight={800} sx={{ letterSpacing: "-.04em", fontSize: "1.05rem" }}>LocalJot</Typography>
         <IconButton
           onClick={() => setModelSettingsOpen((o) => !o)}
           aria-label="Model settings"
@@ -358,24 +423,57 @@ export default function App() {
 
         {/* Mobile drawer */}
         <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={{ display: { md: "none" } }}>
-          <Box sx={{ width: "min(85vw, 320px)", height: "100%", bgcolor: "background.paper" }}>
-              <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
-                <IconButton
-                  onClick={() => setDrawerOpen(false)}
-                  aria-label="Close notes"
-                  size="large">
-                  <X size={20} />
-                </IconButton>
-              </Box>
-              <Box sx={{ height: "calc(100% - 64px)", overflow: "hidden" }}>
-                <Sidebar notes={notes} selectedId={selectedNote?.id} onSelect={openNote} onNewNote={newNote} onRename={handleSidebarRename} onDelete={handleSidebarDelete} storage={storage} />
-              </Box>
+          <Box sx={{ width: "min(88vw, 340px)", height: "100%", bgcolor: "background.paper", backgroundImage: "linear-gradient(180deg, #fbfaff 0%, #ffffff 30%)" }}>
+          <Box sx={{ height: "100%", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" }}>
+            <Sidebar
+              notes={notes}
+              selectedId={selectedNote?.id}
+              onSelect={openNote}
+              onNewNote={newNote}
+              onRename={handleSidebarRename}
+              onDelete={handleSidebarDelete}
+              storage={storage}
+              onClose={() => setDrawerOpen(false)}
+            />
+          </Box>
           </Box>
         </Drawer>
 
-        <Box component="main" sx={{ width: "100%", minWidth: 0, px: { xs: 2, md: "4vw" }, py: { xs: 2, md: 4 } }}>
+        <Box component="main" sx={{ width: "100%", minWidth: 0, px: { xs: 1.25, sm: 3, md: "4vw" }, py: { xs: 1.25, md: 4 }, pb: { xs: "calc(80px + env(safe-area-inset-bottom))", md: 4 }, background: "linear-gradient(145deg, #f7f7fb 0%, #fbfbfd 52%, #f5f3ff 100%)" }}>
           {processingLabel && (
-            <Chip size="small" color="secondary" variant="outlined" label={processingLabel} sx={{ mb: 2 }} />
+            <Paper variant="outlined" role="status" aria-live="polite" sx={{ mb: 2, px: 1.5, py: 1, maxWidth: 560 }}>
+              <Stack direction="row" alignItems="center" spacing={1.25}>
+                <CircularProgress size={17} color="secondary" />
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={700}>{processingLabel}</Typography>
+                  {selectedFile && (
+                    <Typography variant="caption" color="text.secondary" noWrap display="block">
+                      {selectedFile.name}
+                    </Typography>
+                  )}
+                </Box>
+                <Button
+                  onClick={cancelProcessing}
+                  size="small"
+                  color="inherit"
+                  startIcon={<Square size={13} />}
+                  sx={{ ml: "auto", flexShrink: 0 }}>
+                  Stop
+                </Button>
+              </Stack>
+              {processingLabel === "Converting MP3 to WAV" && (
+                <LinearProgress color="secondary" sx={{ mt: 1.25, borderRadius: 1 }} />
+              )}
+            </Paper>
+          )}
+          {selectedFile && !processingLabel && (
+            <Chip
+              size="small"
+              color="secondary"
+              variant="outlined"
+              label={`Selected: ${selectedFile.name}`}
+              sx={{ mb: 2, maxWidth: "100%" }}
+            />
           )}
           <Box sx={{ mb: { md: 8 }, display: { xs: "none", md: "block" } }}>
             <Typography variant="body2" color="text.secondary">Private · on-device transcription</Typography>
@@ -389,6 +487,11 @@ export default function App() {
             onLoadModel={models.loadModel}
             transcriberStatus={models.transcriberStatus}
             summarizerStatus={models.summarizerStatus}
+            speakerLabels={speakerLabels}
+            onSpeakerLabelsChange={(enabled) => {
+              setSpeakerLabels(enabled);
+              localStorage.setItem("localjot-speaker-labels", String(enabled));
+            }}
           />
 
           {view === "new" && (
@@ -436,6 +539,14 @@ export default function App() {
               onExportTranscript={() => download(transcript, `${title || "note"}.txt`, "text/plain")}
               onExportSummary={() => download(summaryMarkdown, `${title || "note"}.md`, "text/markdown")}
               onDelete={handleDeleteNote}
+              speakerLabels={speakerLabels}
+              onSpeakerLabelsChange={(enabled) => {
+                setSpeakerLabels(enabled);
+                localStorage.setItem("localjot-speaker-labels", String(enabled));
+                redoTranscript(enabled);
+              }}
+              onRedoTranscript={() => redoTranscript()}
+              transcriptError={recordError}
             />
           )}
 

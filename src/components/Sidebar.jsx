@@ -1,4 +1,4 @@
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, LinearProgress, List, ListItemButton, ListItemText, Stack, TextField, Typography } from "@mui/material";
 
@@ -9,7 +9,7 @@ function noteTitle(note) {
   return note.title || firstLine || "Untitled note";
 }
 
-export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRename, onDelete, storage }) {
+export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRename, onDelete, storage, onClose }) {
   const [renameNote, setRenameNote] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteNote, setDeleteNote] = useState(null);
@@ -35,11 +35,16 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRena
 
   return (
     <Box sx={{ display: "flex", height: "100%", flexDirection: "column", px: { xs: 1.5, md: 2.5 }, py: { xs: 2, md: 3 } }}>
-      <Stack direction="row" spacing={1.25} alignItems="center" sx={{ px: 1, pb: 1.25 }}>
+      <Stack direction="row" spacing={1.25} alignItems="center" sx={{ px: 1, pb: 2 }}>
         <img style={{ width: 34, height: 34 }} src={iconUrl} alt="" />
-        <Box><Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>LocalJot</Typography><Typography variant="caption" color="text.secondary">Private voice notes</Typography></Box>
+        <Box sx={{ minWidth: 0, flex: 1 }}><Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>LocalJot</Typography><Typography variant="caption" color="text.secondary">Private voice notes</Typography></Box>
+        {onClose && (
+          <IconButton onClick={onClose} aria-label="Close notes" size="large">
+            <X size={20} />
+          </IconButton>
+        )}
       </Stack>
-      <Button onClick={onNewNote} variant="contained" startIcon={<Plus size={18} />} sx={{ minHeight: 44, justifyContent: "flex-start", borderRadius: 2, fontWeight: 700, px: 1.5, bgcolor: "#4c1d95", "&:hover": { bgcolor: "#3b0764" } }}>New note</Button>
+      <Button onClick={onNewNote} variant="contained" startIcon={<Plus size={18} />} sx={{ minHeight: 46, justifyContent: "flex-start", borderRadius: 2.5, fontWeight: 700, px: 1.5, bgcolor: "#4c1d95", boxShadow: "0 8px 18px rgba(76,29,149,.18)", "&:hover": { bgcolor: "#3b0764", boxShadow: "0 10px 22px rgba(76,29,149,.24)" } }}>New note</Button>
       <Stack direction="row" justifyContent="space-between" sx={{ px: 1, pt: 2.5, pb: 1 }}>
         <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: ".12em" }}>Notes</Typography><Chip label={notes.length} size="small" />
       </Stack>
@@ -59,7 +64,7 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRena
             key={note.id}
             onClick={() => onSelect(note)}
             selected={note.id === selectedId}
-            sx={{ borderRadius: 2, mb: .75, px: 1.25, py: 1, "&.Mui-selected": { bgcolor: "#f0edff", borderRadius: 0, borderLeft: 3, borderColor: "secondary.main", "&:hover": { bgcolor: "#ebe7ff" } }, "&:hover .note-actions": { opacity: 1 } }}
+            sx={{ borderRadius: 2, mb: .5, px: 1.25, py: 1.1, "&.Mui-selected": { bgcolor: "#f0edff", borderRadius: 0, borderLeft: 3, borderColor: "secondary.main", "&:hover": { bgcolor: "#ebe7ff" } }, "&:hover .note-actions": { opacity: 1 } }}
           >
             <ListItemText primary={noteTitle(note)} primaryTypographyProps={{ noWrap: true, fontWeight: 700, fontSize: 14 }} />
             <Stack className="note-actions" direction="row" sx={{ opacity: { xs: 1, md: 0 }, transition: "opacity .15s" }}>

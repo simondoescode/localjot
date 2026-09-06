@@ -1,5 +1,5 @@
 import { Circle, Mic, Square } from "lucide-react";
-import { Alert, Box, Card, Chip, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Card, Chip, Stack, Typography } from "@mui/material";
 
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -32,14 +32,21 @@ export default function RecordView({ micState, elapsedMs, waveHeights, onToggleR
         <Typography sx={{ fontSize: { xs: "3.5rem", md: "4.5rem" }, fontWeight: 700, letterSpacing: "-.07em", lineHeight: 1, fontVariantNumeric: "tabular-nums", color: isRecording ? "error.main" : "text.primary" }}>{fmt(elapsedMs)}</Typography>
         <Typography color="text.secondary" sx={{ mt: 1 }}>{isRecording ? "Speak naturally — your audio stays on this device" : STATUS_LABEL[micState]}</Typography>
       <Box sx={{ display: "flex", justifyContent: "center" }}>
-        <button
+        <Button
          onClick={onToggleRecord}
          disabled={micState !== "ready" && micState !== "recording"}
          aria-label={isRecording ? "Stop recording" : "Start recording"}
-         style={{ margin: "24px 0 18px", width: 88, height: 88, borderRadius: "50%", border: 0, color: "white", background: isRecording ? "#e11d48" : "#7c3aed", boxShadow: isRecording ? "0 0 0 10px rgba(225,29,72,.12), 0 12px 30px rgba(225,29,72,.28)" : "0 12px 30px rgba(124,58,237,.28)", cursor: "pointer", transition: "transform .2s, box-shadow .2s" }}
+         sx={{
+           m: "24px 0 18px", width: 88, height: 88, minWidth: 88, borderRadius: "50%", color: "white",
+           bgcolor: isRecording ? "error.main" : "#7c3aed",
+           boxShadow: isRecording ? "0 0 0 10px rgba(225,29,72,.12), 0 12px 30px rgba(225,29,72,.28)" : "0 12px 30px rgba(124,58,237,.28)",
+           "&:hover": { bgcolor: isRecording ? "error.dark" : "#6d28d9", transform: "translateY(-1px)" },
+           "&:focus-visible": { outline: "3px solid #8b5cf6", outlineOffset: 4 },
+           transition: "transform .2s, box-shadow .2s",
+         }}
         >
          {isRecording ? <Square size={28} fill="currentColor" /> : <span style={{ fontSize: "1.875rem" }}>●</span>}
-        </button>
+        </Button>
       </Box>
       <Typography variant="body2" color="text.secondary">{isRecording ? "Tap to stop recording" : "Tap to start recording"}</Typography>
       <Stack direction="row" sx={{ mt: 2, height: 34, justifyContent: "center", alignItems: "center", gap: "3px", px: 2 }}>

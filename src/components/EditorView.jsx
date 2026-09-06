@@ -1,5 +1,5 @@
 import { Copy, Download, Trash2, Sparkles, Eye, Pencil } from "lucide-react";
-import { Alert, Box, Button, Divider, IconButton, LinearProgress, Paper, Stack, TextField, Typography } from "@mui/material";
+import { Alert, Box, Button, Divider, FormControlLabel, IconButton, LinearProgress, Paper, Stack, Switch, TextField, Typography } from "@mui/material";
 
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -26,6 +26,10 @@ export default function EditorView({
   onExportTranscript,
   onExportSummary,
   onDelete,
+  speakerLabels,
+  onSpeakerLabelsChange,
+  onRedoTranscript,
+  transcriptError,
 }) {
   return (
     <Box component="section" sx={{ mx: "auto", maxWidth: 800, pb: { xs: 11, md: 2 } }}>
@@ -35,17 +39,23 @@ export default function EditorView({
         onChange={(e) => onTitleChange(e.target.value)}
         placeholder="Untitled note"
         fullWidth
-        InputProps={{ sx: { fontSize: { xs: "2rem", md: "2.4rem" }, fontWeight: 800, letterSpacing: "-.04em" } }}
+        InputProps={{ sx: { fontSize: { xs: "1.8rem", md: "2.4rem" }, fontWeight: 800, letterSpacing: "-.05em", px: { xs: .5, md: 0 } } }}
       />
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         {new Date(note.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} · {fmt(note.durationMs || 0)}
       </Typography>
-      {audioUrl && <audio style={{ width: "100%", margin: "12px 0" }} controls src={audioUrl} />}
+      {audioUrl && <Paper variant="outlined" sx={{ my: 2, p: { xs: 1, md: 1.5 }, borderRadius: 3, bgcolor: "rgba(255,255,255,.72)" }}><audio style={{ width: "100%", display: "block" }} controls src={audioUrl} /></Paper>}
 
       <Box sx={{ borderTop: 1, borderColor: "divider", py: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 1, gap: 1 }}>
           <Typography variant="overline" sx={{ fontWeight: 800, letterSpacing: ".12em" }}>Transcript</Typography>
-          <Stack direction="row" spacing={.5}>
+          <Stack direction="row" spacing={.5} sx={{ flexWrap: "wrap", justifyContent: { xs: "flex-start", sm: "flex-end" } }}>
+            <FormControlLabel
+              sx={{ mr: 0, "& .MuiFormControlLabel-label": { fontSize: 11 } }}
+              control={<Switch size="small" checked={speakerLabels} onChange={(event) => onSpeakerLabelsChange(event.target.checked)} />}
+              label="Speakers"
+            />
+            <Button onClick={onRedoTranscript} size="small">Redo</Button>
             <IconButton
               onClick={onCopyTranscript}
               aria-label="Copy transcript"
@@ -57,6 +67,12 @@ export default function EditorView({
               size="small"><Download size={16} /></IconButton>
           </Stack>
         </Stack>
+        {transcriptError && <Alert severity="error" sx={{ mb: 2 }}>{transcriptError}</Alert>}
+        {speakerLabels && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+            Speaker labels are approximate and will be applied when you redo the transcript.
+          </Typography>
+        )}
         <TextField
           multiline
           minRows={7}

@@ -1,5 +1,5 @@
-import { Box, Button, Collapse, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Typography, LinearProgress } from "@mui/material";
-export default function ModelSettings({ open, onToggle, modelId, onModelChange, onLoadModel, transcriberStatus, summarizerStatus }) {
+import { Box, Button, Collapse, FormControl, FormControlLabel, InputLabel, MenuItem, Paper, Select, Stack, Switch, Typography, LinearProgress } from "@mui/material";
+export default function ModelSettings({ open, onToggle, modelId, onModelChange, onLoadModel, transcriberStatus, summarizerStatus, speakerLabels, onSpeakerLabelsChange }) {
   return (
     <Paper
       variant="outlined"
@@ -47,6 +47,16 @@ export default function ModelSettings({ open, onToggle, modelId, onModelChange, 
         {summarizerStatus.state === "loading" && (
           <LinearProgress variant="determinate" value={summarizerStatus.progress} color="secondary" sx={{ mt: 1 }} />
         )}
+        <FormControlLabel
+          sx={{ mt: 1, alignItems: "flex-start" }}
+          control={<Switch checked={speakerLabels} onChange={(event) => onSpeakerLabelsChange(event.target.checked)} />}
+          label={
+            <Box>
+              <Typography variant="body2" fontWeight={600}>Approximate speaker labels</Typography>
+              <Typography variant="caption" color="text.secondary">Experimental voice-change detection; it does not identify people.</Typography>
+            </Box>
+          }
+        />
         </Box>
       </Collapse>
     </Paper>
