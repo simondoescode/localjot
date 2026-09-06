@@ -6,6 +6,7 @@ const IDLE = { state: "idle", progress: 0, label: "" };
 export function useModels(modelId) {
   const transcriberRef = useRef(null);
   const summarizerRef = useRef(null);
+  const transcriberLoadRef = useRef(null);
   const [transcriberStatus, setTranscriberStatus] = useState(IDLE);
   const [summarizerStatus, setSummarizerStatus] = useState(IDLE);
 
@@ -30,7 +31,12 @@ export function useModels(modelId) {
 
   const ensureTranscriber = useCallback(async () => {
     if (transcriberRef.current) return true;
-    await loadModel();
+    if (!transcriberLoadRef.current) {
+      transcriberLoadRef.current = loadModel().finally(() => {
+        transcriberLoadRef.current = null;
+      });
+    }
+    await transcriberLoadRef.current;
     return Boolean(transcriberRef.current);
   }, [loadModel]);
 

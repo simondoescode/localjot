@@ -176,7 +176,9 @@ export default function App() {
       setView("new");
       return;
     }
-    await recorder.openMic();
+    if (!(await recorder.openMic())) {
+      setRecordError("Microphone access was unavailable. Allow microphone access and try again.");
+    }
   }, [models, recorder]);
 
   const handleToggleRecord = useCallback(async () => {
@@ -315,7 +317,9 @@ export default function App() {
             summarizerStatus={models.summarizerStatus}
           />
 
-          {view === "new" && <NewNoteView onRecord={openRecorder} onUploadClick={() => fileInputRef.current?.click()} />}
+          {view === "new" && (
+            <NewNoteView onRecord={openRecorder} onUploadClick={() => fileInputRef.current?.click()} error={recordError} />
+          )}
 
           {view === "record" && (
             <RecordView

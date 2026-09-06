@@ -1,11 +1,12 @@
 import { Mic, Upload } from "lucide-react";
 
-export default function NewNoteView({ onRecord, onUploadClick }) {
+export default function NewNoteView({ onRecord, onUploadClick, error }) {
   return (
     <section className="mx-auto mt-[7vh] max-w-xl text-center md:mt-[11vh]">
       <div className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-violet-100 text-3xl text-accent">✦</div>
       <h1 className="mt-5 text-3xl font-bold tracking-tight md:text-[34px]">Start a fresh note</h1>
       <p className="mt-2 text-stone-500">Capture a thought now or turn an existing audio file into a private note.</p>
+      {error && <div className="mx-auto mt-4 max-w-md rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>}
       <div className="mt-8 grid gap-3 text-left sm:grid-cols-2">
         <button
           onClick={onRecord}
