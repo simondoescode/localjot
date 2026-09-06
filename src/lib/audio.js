@@ -47,13 +47,88 @@ export function chunkAudio(samples, sampleRate = 16000, chunkSeconds = 20, overl
   return chunks;
 }
 
+async function decodeWithMediaElement(blob) {
+  const url = URL.createObjectURL(blob);
+  const element = document.createElement("audio");
+  element.src = url;
+  element.preload = "auto";
+  element.muted = true;
+  element.playsInline = true;
+
+  const context = new AudioContext();
+  const source = context.createMediaElementSource(element);
+  const processor = context.createScriptProcessor(4096, 1, 1);
+  const silencer = context.createGain();
+  silencer.gain.value = 0;
+  const chunks = [];
+
+  try {
+    await new Promise((resolve, reject) => {
+      element.addEventListener("canplay", resolve, { once: true });
+      element.addEventListener("error", () => reject(new Error("The browser could not play this audio file.")), { once: true });
+      element.load();
+    });
+    processor.onaudioprocess = (event) => chunks.push(new Float32Array(event.inputBuffer.getChannelData(0)));
+    source.connect(processor);
+    processor.connect(silencer);
+    silencer.connect(context.destination);
+    await context.resume();
+    await new Promise(async (resolve, reject) => {
+      element.addEventListener("ended", resolve, { once: true });
+      element.addEventListener("error", () => reject(new Error("The browser stopped decoding this audio file.")), { once: true });
+      try {
+        await element.play();
+      } catch (err) {
+        reject(err);
+      }
+    });
+
+    const length = chunks.reduce((total, chunk) => total + chunk.length, 0);
+    const samples = new Float32Array(length);
+    let offset = 0;
+    chunks.forEach((chunk) => {
+      samples.set(chunk, offset);
+      offset += chunk.length;
+    });
+    return { samples, sampleRate: context.sampleRate, durationMs: Math.round(element.duration * 1000) };
+  } finally {
+    element.pause();
+    processor.disconnect();
+    source.disconnect();
+    silencer.disconnect();
+    await context.close();
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function resampleTo16k(samples, sampleRate, durationMs) {
+  if (sampleRate === 16000) return { audio: normalizeSpeech(samples), durationMs };
+  const length = Math.max(1, Math.ceil((samples.length / sampleRate) * 16000));
+  const offline = new OfflineAudioContext(1, length, 16000);
+  const buffer = offline.createBuffer(1, samples.length, sampleRate);
+  buffer.copyToChannel(samples, 0);
+  const source = offline.createBufferSource();
+  source.buffer = buffer;
+  source.connect(offline.destination);
+  source.start();
+  const rendered = await offline.startRendering();
+  return { audio: normalizeSpeech(rendered.getChannelData(0)), durationMs };
+}
+
 // Decodes any audio/video blob to mono 16kHz Float32 samples (what the
 // Whisper pipeline expects), resampling only when the source isn't already
 // 16kHz.
 export async function decodeAudio(blob) {
   const ctx = new AudioContext();
   try {
-    const decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+    let decoded;
+    try {
+      decoded = await ctx.decodeAudioData(await blob.arrayBuffer());
+    } catch (decodeError) {
+      console.warn("Direct audio decoding failed; trying media playback fallback.", decodeError);
+      const fallback = await decodeWithMediaElement(blob);
+      return resampleTo16k(fallback.samples, fallback.sampleRate, fallback.durationMs);
+    }
     const mono = new Float32Array(decoded.length);
     for (let channel = 0; channel < decoded.numberOfChannels; channel++) {
       const source = decoded.getChannelData(channel);
@@ -62,19 +137,7 @@ export async function decodeAudio(blob) {
     if (decoded.sampleRate === 16000) {
       return { audio: normalizeSpeech(mono), durationMs: Math.round(decoded.duration * 1000) };
     }
-    const length = Math.max(1, Math.ceil(decoded.duration * 16000));
-    const offline = new OfflineAudioContext(1, length, 16000);
-    const buffer = offline.createBuffer(1, mono.length, decoded.sampleRate);
-    buffer.copyToChannel(mono, 0);
-    const source = offline.createBufferSource();
-    source.buffer = buffer;
-    source.connect(offline.destination);
-    source.start();
-    const rendered = await offline.startRendering();
-    return {
-      audio: normalizeSpeech(rendered.getChannelData(0)),
-      durationMs: Math.round(decoded.duration * 1000),
-    };
+    return resampleTo16k(mono, decoded.sampleRate, Math.round(decoded.duration * 1000));
   } finally {
     await ctx.close();
   }
