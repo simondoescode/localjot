@@ -51,10 +51,10 @@ export async function loadTranscriber(modelId, onProgress) {
   });
 }
 
-export async function loadSummarizer(onProgress) {
+export async function loadSummarizer(modelId, onProgress) {
   const { pipeline } = await getTransformers();
   const device = await pickDevice();
-  return pipeline("summarization", "Xenova/distilbart-cnn-6-6", {
+  return pipeline("summarization", modelId, {
     device,
     dtype: device === "webgpu" ? "q4" : "q8",
     progress_callback: onProgress,

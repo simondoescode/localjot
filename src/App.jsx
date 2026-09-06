@@ -19,10 +19,14 @@ import { summarizeTranscript } from "./lib/summarize.js";
 marked.setOptions({ breaks: true });
 
 const theme = createTheme({
-  palette: { mode: "light", primary: { main: "#292524" }, secondary: { main: "#7c3aed", light: "#ede9fe" }, background: { default: "#fafaf9", paper: "#ffffff" } },
-  typography: { fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif', button: { textTransform: "none" } },
-  shape: { borderRadius: 12 },
-  components: { MuiButton: { defaultProps: { disableElevation: true } }, MuiCard: { styleOverrides: { root: { boxShadow: "0 8px 30px rgba(28,25,23,.04)" } } } },
+  palette: { mode: "light", primary: { main: "#292524" }, secondary: { main: "#6d5bd0", light: "#f0edff" }, background: { default: "#fafaf9", paper: "#ffffff" } },
+  typography: { fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif', button: { textTransform: "none", fontWeight: 600 } },
+  shape: { borderRadius: 10 },
+  components: {
+    MuiButton: { defaultProps: { disableElevation: true } },
+    MuiCard: { styleOverrides: { root: { boxShadow: "none", borderColor: "#e7e5e4" } } },
+    MuiPaper: { styleOverrides: { outlined: { borderColor: "#e7e5e4" } } },
+  },
 });
 
 function safeId() {
@@ -54,8 +58,9 @@ export default function App() {
   const { notes, saveNote, deleteNote } = useNotes();
   const storage = useStorageInfo();
   const [modelId, setModelId] = useState("Xenova/whisper-tiny.en");
+  const [summarizerModelId, setSummarizerModelId] = useState("Xenova/distilbart-cnn-6-6");
   const [modelSettingsOpen, setModelSettingsOpen] = useState(false);
-  const models = useModels(modelId);
+  const models = useModels(modelId, summarizerModelId);
 
   const [view, setView] = useState("new"); // new | record | editor
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -326,7 +331,7 @@ export default function App() {
   }, [deleteNote]);
 
   return (
-    <ThemeProvider theme={theme}><CssBaseline /><SetupWizard open={setupOpen} onComplete={completeSetup} onRequestMic={recorder.openMic} onLoadModel={models.ensureTranscriber} micReady={recorder.micState === "ready"} modelStatus={models.transcriberStatus} /><Box sx={{ minHeight: "100dvh", bgcolor: "background.default", color: "text.primary" }}>
+    <ThemeProvider theme={theme}><CssBaseline /><SetupWizard open={setupOpen} onComplete={completeSetup} onRequestMic={recorder.openMic} onLoadModels={(speechId, summaryId) => models.ensureTranscriber(speechId).then((loaded) => loaded && models.ensureSummarizer(summaryId))} onModelChange={setModelId} speechModelId={modelId} summaryModelId={summarizerModelId} onSummaryModelChange={setSummarizerModelId} micReady={recorder.micState === "ready"} modelStatus={models.transcriberStatus} summaryStatus={models.summarizerStatus} /><Box sx={{ minHeight: "100dvh", bgcolor: "background.default", color: "text.primary" }}>
       {/* Mobile top bar */}
       <AppBar position="sticky" color="inherit" elevation={0} sx={{ display: { xs: "block", md: "none" }, borderBottom: 1, borderColor: "divider", bgcolor: "rgba(250,250,249,.9)", backdropFilter: "blur(16px)" }}>
         <Toolbar sx={{ justifyContent: "space-between", minHeight: 56 }}>
@@ -336,7 +341,7 @@ export default function App() {
           size="large">
           <Menu size={20} />
         </IconButton>
-        <Typography fontWeight={800}>Jot</Typography>
+        <Typography fontWeight={800}>LocalJot</Typography>
         <IconButton
           onClick={() => setModelSettingsOpen((o) => !o)}
           aria-label="Model settings"
@@ -368,7 +373,7 @@ export default function App() {
           </Box>
         </Drawer>
 
-        <Box component="main" sx={{ width: "100%", maxWidth: 1100, px: { xs: 2, md: "7vw" }, py: { xs: 2, md: 4 } }}>
+        <Box component="main" sx={{ width: "100%", minWidth: 0, px: { xs: 2, md: "4vw" }, py: { xs: 2, md: 4 } }}>
           {processingLabel && (
             <Chip size="small" color="secondary" variant="outlined" label={processingLabel} sx={{ mb: 2 }} />
           )}

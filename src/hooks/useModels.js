@@ -3,17 +3,17 @@ import { loadTranscriber, loadSummarizer, releaseModel, isMobileDevice } from ".
 
 const IDLE = { state: "idle", progress: 0, label: "" };
 
-export function useModels(modelId) {
+export function useModels(modelId, summarizerModelId) {
   const transcriberRef = useRef(null);
   const summarizerRef = useRef(null);
   const transcriberLoadRef = useRef(null);
   const [transcriberStatus, setTranscriberStatus] = useState(IDLE);
   const [summarizerStatus, setSummarizerStatus] = useState(IDLE);
 
-  const loadModel = useCallback(async () => {
+  const loadModel = useCallback(async (requestedModelId = modelId) => {
     setTranscriberStatus({ state: "loading", progress: 2, label: "Preparing speech model…" });
     try {
-      transcriberRef.current = await loadTranscriber(modelId, (p) => {
+      transcriberRef.current = await loadTranscriber(requestedModelId, (p) => {
         if (typeof p?.progress === "number") {
           setTranscriberStatus({
             state: "loading",
@@ -31,10 +31,10 @@ export function useModels(modelId) {
     }
   }, [modelId]);
 
-  const ensureTranscriber = useCallback(async () => {
+  const ensureTranscriber = useCallback(async (requestedModelId = modelId) => {
     if (transcriberRef.current) return true;
     if (!transcriberLoadRef.current) {
-      transcriberLoadRef.current = loadModel().finally(() => {
+      transcriberLoadRef.current = loadModel(requestedModelId).finally(() => {
         transcriberLoadRef.current = null;
       });
     }
@@ -42,7 +42,7 @@ export function useModels(modelId) {
     return Boolean(transcriberRef.current);
   }, [loadModel]);
 
-  const ensureSummarizer = useCallback(async () => {
+  const ensureSummarizer = useCallback(async (requestedModelId = summarizerModelId) => {
     if (summarizerRef.current) return true;
     setSummarizerStatus({ state: "loading", progress: 2, label: "Downloading the private summary model…" });
     try {
@@ -60,7 +60,7 @@ export function useModels(modelId) {
         transcriberRef.current = null;
         setTranscriberStatus(IDLE);
       }
-      summarizerRef.current = await loadSummarizer((p) => {
+      summarizerRef.current = await loadSummarizer(requestedModelId, (p) => {
         if (typeof p?.progress === "number") {
           setSummarizerStatus({
             state: "loading",
@@ -80,7 +80,7 @@ export function useModels(modelId) {
       });
       return false;
     }
-  }, []);
+  }, [summarizerModelId]);
 
   return {
     transcriberRef,

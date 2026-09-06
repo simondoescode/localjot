@@ -1,64 +1,67 @@
 import { useState } from "react";
-import { CheckCircle2, Mic, Download, ArrowRight } from "lucide-react";
+import { ArrowRight, CheckCircle2, Download, Mic } from "lucide-react";
 import {
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  LinearProgress,
-  List,
-  ListItem,
-  ListItemIcon,
-  ListItemText,
-  Stack,
-  Typography,
+  Button, Dialog, DialogActions, DialogContent, DialogTitle, FormControl,
+  InputLabel, LinearProgress, MenuItem, Select, Stack, Typography,
 } from "@mui/material";
 
-export default function SetupWizard({ open, onComplete, onRequestMic, onLoadModel, micReady, modelStatus }) {
+const speechModels = [
+  ["Xenova/whisper-tiny.en", "Whisper Tiny (English)", "75 MB"],
+  ["Xenova/whisper-base.en", "Whisper Base (English)", "145 MB"],
+];
+const summaryModels = [["Xenova/distilbart-cnn-6-6", "DistilBART", "1.2 GB"]];
+
+export default function SetupWizard({
+  open, onComplete, onRequestMic, onLoadModels, micReady, modelStatus, summaryStatus,
+  speechModelId, onModelChange, summaryModelId, onSummaryModelChange,
+}) {
   const [step, setStep] = useState(0);
   const [micError, setMicError] = useState("");
+  const [speech, setSpeech] = useState(speechModelId);
+  const [summary, setSummary] = useState(summaryModelId);
 
   const requestMic = async () => {
     setMicError("");
-    const granted = await onRequestMic();
-    if (granted) setStep(1);
-    else setMicError("Microphone access was not granted. Check your browser permissions and try again.");
+    if (await onRequestMic()) setStep(1);
+    else setMicError("Microphone access was not granted. Check browser permissions and try again.");
   };
-
-  const loadModel = async () => {
-    const loaded = await onLoadModel();
-    if (loaded) setStep(2);
+  const loadModels = async () => {
+    if (await onLoadModels(speech, summary)) {
+      onModelChange(speech);
+      onSummaryModelChange(summary);
+      setStep(2);
+    }
   };
 
   return (
     <Dialog open={open} fullWidth maxWidth="sm" disableEscapeKeyDown>
-      <DialogTitle sx={{ fontWeight: 800, fontSize: "1.5rem" }}>Welcome to Jot</DialogTitle>
+      <DialogTitle sx={{ fontWeight: 800, fontSize: "1.5rem" }}>Welcome to LocalJot</DialogTitle>
       <DialogContent>
-        <Typography color="text.secondary" sx={{ mb: 2 }}>
-          Set up private, on-device voice notes in two quick steps.
-        </Typography>
-        <List disablePadding>
-          <ListItem sx={{ px: 0 }}>
-            <ListItemIcon><Mic color={micReady ? "#16a34a" : undefined} /></ListItemIcon>
-            <ListItemText primary="Allow microphone access" secondary={micReady ? "Microphone is ready." : "Needed to record voice notes."} />
-            {micReady && <CheckCircle2 color="#16a34a" size={21} />}
-          </ListItem>
-          <ListItem sx={{ px: 0 }}>
-            <ListItemIcon><Download color={modelStatus.state === "ready" ? "#16a34a" : undefined} /></ListItemIcon>
-            <ListItemText primary="Download the speech model" secondary={modelStatus.state === "ready" ? "Ready and cached on this device." : "Downloaded once, then used offline."} />
-            {modelStatus.state === "ready" && <CheckCircle2 color="#16a34a" size={21} />}
-          </ListItem>
-        </List>
-        {micError && <Typography color="error" variant="body2" sx={{ mt: 1 }}>{micError}</Typography>}
-        {modelStatus.state === "loading" && <Stack spacing={1} sx={{ mt: 2 }}><LinearProgress variant="determinate" value={modelStatus.progress} color="secondary" /><Typography variant="caption" color="text.secondary">{modelStatus.label}</Typography></Stack>}
-        {modelStatus.state === "error" && <Typography color="error" variant="body2" sx={{ mt: 1 }}>{modelStatus.label}</Typography>}
-        {step === 2 && <Typography color="success.main" sx={{ mt: 2, fontWeight: 600 }}>You’re all set. Your audio and transcripts stay on this device.</Typography>}
+        <Typography color="text.secondary" sx={{ mb: 2 }}>Choose your local models, then grant microphone access.</Typography>
+        {step === 0 && <Button fullWidth variant="contained" startIcon={<Mic size={17} />} onClick={requestMic}>Allow microphone</Button>}
+        {step >= 1 && (
+          <Stack spacing={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Speech model</InputLabel>
+              <Select value={speech} label="Speech model" onChange={(e) => setSpeech(e.target.value)} disabled={modelStatus.state === "loading"}>{speechModels.map(([id, name, size]) => <MenuItem key={id} value={id}>{name} · {size}</MenuItem>)}</Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Summary model</InputLabel>
+              <Select value={summary} label="Summary model" onChange={(e) => setSummary(e.target.value)} disabled={summaryStatus.state === "loading"}>{summaryModels.map(([id, name, size]) => <MenuItem key={id} value={id}>{name} · {size}</MenuItem>)}</Select>
+            </FormControl>
+            <Typography variant="caption" color="text.secondary">Models download once and remain cached on this device.</Typography>
+            {(modelStatus.state === "loading" || summaryStatus.state === "loading") && <Stack spacing={1}><LinearProgress variant="determinate" value={Math.max(modelStatus.progress, summaryStatus.progress)} color="secondary" /><Typography variant="caption" color="text.secondary">{summaryStatus.state === "loading" ? summaryStatus.label : modelStatus.label}</Typography></Stack>}
+            {modelStatus.state === "error" && <Typography color="error" variant="body2">{modelStatus.label}</Typography>}
+            {summaryStatus.state === "error" && <Typography color="error" variant="body2">{summaryStatus.label}</Typography>}
+            {micError && <Typography color="error" variant="body2">{micError}</Typography>}
+            {micReady && <Typography color="success.main" variant="body2"><CheckCircle2 size={16} /> Microphone ready</Typography>}
+          </Stack>
+        )}
+        {step === 2 && <Typography color="success.main" sx={{ mt: 2, fontWeight: 600 }}>Everything is ready. Audio and transcripts stay on this device.</Typography>}
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
-        {step === 0 && <Button variant="contained" startIcon={<Mic size={17} />} onClick={requestMic}>Allow microphone</Button>}
-        {step === 1 && <Button variant="contained" color="secondary" startIcon={<Download size={17} />} onClick={loadModel} disabled={modelStatus.state === "loading"}>Download model</Button>}
-        {step === 2 && <Button variant="contained" endIcon={<ArrowRight size={17} />} onClick={onComplete}>Start using Jot</Button>}
+        {step === 1 && <Button variant="contained" color="secondary" startIcon={<Download size={17} />} onClick={loadModels} disabled={modelStatus.state === "loading" || summaryStatus.state === "loading"}>Download models</Button>}
+        {step === 2 && <Button variant="contained" endIcon={<ArrowRight size={17} />} onClick={onComplete}>Start using LocalJot</Button>}
       </DialogActions>
     </Dialog>
   );

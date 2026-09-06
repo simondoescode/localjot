@@ -1,6 +1,6 @@
 {
-  "name": "Jot — Private Voice Notes",
-  "short_name": "Jot",
+  "name": "LocalJot — Private Voice Notes",
+  "short_name": "LocalJot",
   "start_url": ".",
   "display": "standalone",
   "background_color": "#f7f7f5",

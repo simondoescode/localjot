@@ -5,9 +5,9 @@ export default function ModelSettings({ open, onToggle, modelId, onModelChange, 
       variant="outlined"
       onClick={() => onToggle(!open)}
       sx={{
-        mb: 3,
-        p: 2,
-        borderRadius: 3,
+        mb: 2,
+        p: 1.5,
+        borderRadius: 2,
         cursor: "pointer",
         transition: "border-color .2s, background-color .2s",
         "&:hover": { borderColor: "secondary.main", bgcolor: "secondary.50" },

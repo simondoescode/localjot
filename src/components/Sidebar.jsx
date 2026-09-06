@@ -1,5 +1,5 @@
 import { Pencil, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, LinearProgress, List, ListItemButton, ListItemText, Stack, TextField, Typography } from "@mui/material";
 
 const iconUrl = `${import.meta.env.BASE_URL}icon.svg`;
@@ -13,6 +13,18 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRena
   const [renameNote, setRenameNote] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteNote, setDeleteNote] = useState(null);
+  const [memory, setMemory] = useState(null);
+  const ragColor = (value) => (value >= 80 ? "error" : value >= 60 ? "warning" : "success");
+
+  useEffect(() => {
+    const updateMemory = () => {
+      const info = performance.memory;
+      setMemory(info ? { used: info.usedJSHeapSize, limit: info.jsHeapSizeLimit } : null);
+    };
+    updateMemory();
+    const timer = setInterval(updateMemory, 2000);
+    return () => clearInterval(timer);
+  }, []);
 
   const submitRename = async () => {
     const title = renameValue.trim();
@@ -22,23 +34,32 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRena
   };
 
   return (
-    <Box sx={{ display: "flex", height: "100%", flexDirection: "column", px: { xs: 1.5, md: 2 }, py: { xs: 2, md: 3 } }}>
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ px: 1, pb: 3 }}>
+    <Box sx={{ display: "flex", height: "100%", flexDirection: "column", px: { xs: 1.5, md: 2.5 }, py: { xs: 2, md: 3 } }}>
+      <Stack direction="row" spacing={1.25} alignItems="center" sx={{ px: 1, pb: 1.25 }}>
         <img style={{ width: 34, height: 34 }} src={iconUrl} alt="" />
-        <Box><Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>Jot</Typography><Typography variant="caption" color="text.secondary">Private voice notes</Typography></Box>
+        <Box><Typography variant="h6" sx={{ fontWeight: 800, lineHeight: 1 }}>LocalJot</Typography><Typography variant="caption" color="text.secondary">Private voice notes</Typography></Box>
       </Stack>
-      <Button onClick={onNewNote} variant="contained" color="primary" startIcon={<Plus size={18} />} sx={{ minHeight: 46, justifyContent: "flex-start", borderRadius: 2.5, fontWeight: 700 }}>New note</Button>
-      <Stack direction="row" justifyContent="space-between" sx={{ px: 1, pt: 4, pb: 1 }}>
+      <Button onClick={onNewNote} variant="contained" startIcon={<Plus size={18} />} sx={{ minHeight: 44, justifyContent: "flex-start", borderRadius: 2, fontWeight: 700, px: 1.5, bgcolor: "#4c1d95", "&:hover": { bgcolor: "#3b0764" } }}>New note</Button>
+      <Stack direction="row" justifyContent="space-between" sx={{ px: 1, pt: 2.5, pb: 1 }}>
         <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: ".12em" }}>Notes</Typography><Chip label={notes.length} size="small" />
       </Stack>
-      <List disablePadding sx={{ flex: 1, overflow: "auto" }}>
+      <List
+        disablePadding
+        sx={{
+          flex: 1,
+          overflow: "auto",
+          mx: { xs: -1.5, md: -2.5 },
+          width: { xs: "calc(100% + 24px)", md: "calc(100% + 40px)" },
+          py: 0.5,
+        }}
+      >
         {notes.length === 0 && <Typography variant="caption" color="text.secondary" sx={{ p: 1, display: "block" }}>No notes yet</Typography>}
         {notes.map((note) => (
           <ListItemButton
             key={note.id}
             onClick={() => onSelect(note)}
             selected={note.id === selectedId}
-            sx={{ borderRadius: 2.5, mb: .5, "&.Mui-selected": { bgcolor: "secondary.50", borderLeft: 3, borderColor: "secondary.main" }, "&:hover .note-actions": { opacity: 1 } }}
+            sx={{ borderRadius: 2, mb: .75, px: 1.25, py: 1, "&.Mui-selected": { bgcolor: "#f0edff", borderRadius: 0, borderLeft: 3, borderColor: "secondary.main", "&:hover": { bgcolor: "#ebe7ff" } }, "&:hover .note-actions": { opacity: 1 } }}
           >
             <ListItemText primary={noteTitle(note)} primaryTypographyProps={{ noWrap: true, fontWeight: 700, fontSize: 14 }} />
             <Stack className="note-actions" direction="row" sx={{ opacity: { xs: 1, md: 0 }, transition: "opacity .15s" }}>
@@ -53,7 +74,25 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRena
         ))}
       </List>
       <Divider sx={{ mt: 2 }} />
-      <Box sx={{ px: 1, pt: 2 }}><Typography variant="subtitle2">On-device storage</Typography><Typography variant="caption" color="text.secondary">{storage.usageLabel}</Typography><LinearProgress variant="determinate" value={storage.percent} color="secondary" sx={{ my: 1, height: 6, borderRadius: 5 }} /><Typography variant="caption" color="text.secondary">{storage.remainingLabel}</Typography></Box>
+      <Box sx={{ px: 1, pt: 2, display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 1 }}>
+        <Box sx={{ minWidth: 0, minHeight: 48, display: "flex", flexDirection: "column" }}>
+          <Typography variant="caption" display="block" sx={{ color: "#292524", fontSize: 12, fontWeight: 900, letterSpacing: ".02em" }}>Storage</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" noWrap sx={{ lineHeight: 1.3 }}>{storage.usageLabel} · {storage.remainingLabel}</Typography>
+          <LinearProgress variant="determinate" value={storage.percent} color={ragColor(storage.percent)} sx={{ mt: "auto", height: 3, borderRadius: 5 }} />
+        </Box>
+        <Box sx={{ minWidth: 0, minHeight: 48, display: "flex", flexDirection: "column" }}>
+          <Typography variant="caption" display="block" sx={{ color: "#292524", fontSize: 12, fontWeight: 900, letterSpacing: ".02em" }}>Memory</Typography>
+          <Typography variant="caption" color="text.secondary" display="block" noWrap sx={{ lineHeight: 1.3 }}>
+            {memory ? `${(memory.used / 1048576).toFixed(0)} / ${(memory.limit / 1048576).toFixed(0)} MB` : "Estimate unavailable"}
+          </Typography>
+          <LinearProgress
+            variant={memory ? "determinate" : "indeterminate"}
+            value={memory ? Math.min(100, (memory.used / memory.limit) * 100) : undefined}
+            color={memory ? ragColor((memory.used / memory.limit) * 100) : "warning"}
+            sx={{ mt: "auto", height: 3, borderRadius: 5 }}
+          />
+        </Box>
+      </Box>
       <Dialog open={Boolean(renameNote)} onClose={() => setRenameNote(null)} fullWidth maxWidth="xs">
         <DialogTitle>Rename note</DialogTitle>
         <DialogContent><TextField autoFocus fullWidth label="Note name" value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submitRename(); }} sx={{ mt: 1 }} /></DialogContent>
