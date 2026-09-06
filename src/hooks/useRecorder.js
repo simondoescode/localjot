@@ -6,6 +6,8 @@ export function useRecorder({ onStop }) {
   const [micState, setMicState] = useState("idle");
   const [elapsedMs, setElapsedMs] = useState(0);
   const [waveHeights, setWaveHeights] = useState(() => Array(WAVE_BARS).fill(4));
+  const [inputDevices, setInputDevices] = useState([]);
+  const [isPaused, setIsPaused] = useState(false);
 
   const streamRef = useRef(null);
   const contextRef = useRef(null);
@@ -20,7 +22,7 @@ export function useRecorder({ onStop }) {
   const animationRef = useRef(null);
   const recordingRef = useRef(false);
 
-  const openMic = useCallback(async () => {
+  const openMic = useCallback(async (deviceId = "") => {
     setMicState("requesting");
     try {
       if (!navigator.mediaDevices?.getUserMedia || typeof AudioContext === "undefined") {
@@ -32,8 +34,11 @@ export function useRecorder({ onStop }) {
           echoCancellation: false,
           noiseSuppression: false,
           autoGainControl: false,
+          ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
         },
       });
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      setInputDevices(devices.filter((device) => device.kind === "audioinput"));
       const track = streamRef.current.getAudioTracks()[0];
       if (!track || track.readyState !== "live") {
         throw new Error("The selected microphone is not producing audio.");
@@ -53,6 +58,7 @@ export function useRecorder({ onStop }) {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
     setMicState("idle");
+    setIsPaused(false);
   }, []);
 
   const animateWave = useCallback(() => {
@@ -115,7 +121,9 @@ export function useRecorder({ onStop }) {
     const silentOutput = context.createGain();
     silentOutput.gain.value = 0.001;
     chunksRef.current = [];
-    worklet.port.onmessage = (event) => chunksRef.current.push(event.data);
+    worklet.port.onmessage = (event) => {
+      if (!isPausedRef.current) chunksRef.current.push(event.data);
+    };
     source.connect(analyser);
     source.connect(worklet);
     worklet.connect(silentOutput);
@@ -132,6 +140,7 @@ export function useRecorder({ onStop }) {
     analyserRef.current = analyser;
     analyserDataRef.current = analyserData;
     recordingRef.current = true;
+    isPausedRef.current = false;
     startedAtRef.current = Date.now();
     setElapsedMs(0);
     timerRef.current = setInterval(() => setElapsedMs(Date.now() - startedAtRef.current), 200);
@@ -139,9 +148,30 @@ export function useRecorder({ onStop }) {
     animateWave();
   }, [animateWave]);
 
+  const isPausedRef = useRef(false);
+  const pauseStartedRef = useRef(0);
+  const pauseRecording = useCallback(() => {
+    if (!recordingRef.current || isPausedRef.current) return;
+    isPausedRef.current = true;
+    pauseStartedRef.current = Date.now();
+    clearInterval(timerRef.current);
+    setIsPaused(true);
+    setMicState("paused");
+  }, []);
+
+  const resumeRecording = useCallback(() => {
+    if (!recordingRef.current || !isPausedRef.current) return;
+    startedAtRef.current += Date.now() - pauseStartedRef.current;
+    isPausedRef.current = false;
+    setIsPaused(false);
+    timerRef.current = setInterval(() => setElapsedMs(Date.now() - startedAtRef.current), 200);
+    setMicState("recording");
+  }, []);
+
   const stopRecording = useCallback(async () => {
     if (!recordingRef.current) return;
     recordingRef.current = false;
+    isPausedRef.current = false;
     setMicState("saving");
     clearInterval(timerRef.current);
     cancelAnimationFrame(animationRef.current);
@@ -201,5 +231,5 @@ export function useRecorder({ onStop }) {
     []
   );
 
-  return { micState, elapsedMs, waveHeights, openMic, closeMic, startRecording, stopRecording };
+  return { micState, elapsedMs, waveHeights, inputDevices, isPaused, openMic, closeMic, startRecording, pauseRecording, resumeRecording, stopRecording };
 }

@@ -1,5 +1,5 @@
 import { Copy, Download, Trash2, Sparkles, Eye, Pencil } from "lucide-react";
-import { Alert, Box, Button, Divider, FormControlLabel, IconButton, LinearProgress, Paper, Stack, Switch, TextField, Typography } from "@mui/material";
+import { Alert, Autocomplete, Box, Button, Chip, Collapse, Divider, FormControl, FormControlLabel, IconButton, InputLabel, LinearProgress, MenuItem, Paper, Select, Stack, Switch, TextField, Typography } from "@mui/material";
 
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -30,6 +30,14 @@ export default function EditorView({
   onSpeakerLabelsChange,
   onRedoTranscript,
   transcriptError,
+  tags,
+  onTagsChange,
+  availableTags = [],
+  preset,
+  transcriptOpen,
+  onTranscriptToggle,
+  summaryOpen,
+  onSummaryToggle,
 }) {
   return (
     <Box component="section" sx={{ mx: "auto", maxWidth: 800, pb: { xs: 11, md: 2 } }}>
@@ -38,17 +46,54 @@ export default function EditorView({
         value={title}
         onChange={(e) => onTitleChange(e.target.value)}
         placeholder="Untitled note"
+        label="Note title"
         fullWidth
+        helperText={false}
         InputProps={{ sx: { fontSize: { xs: "1.8rem", md: "2.4rem" }, fontWeight: 800, letterSpacing: "-.05em", px: { xs: .5, md: 0 } } }}
       />
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
         {new Date(note.createdAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} · {fmt(note.durationMs || 0)}
       </Typography>
+      {preset && <Chip label={`${preset.replace("-", " ")} preset`} size="small" variant="outlined" color="secondary" sx={{ mb: 2, textTransform: "capitalize" }} />}
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25} sx={{ mb: 2, maxWidth: 620 }}>
+        <FormControl size="small" fullWidth>
+          <InputLabel>Existing tags</InputLabel>
+          <Select
+            multiple
+            value={tags.filter((tag) => availableTags.includes(tag))}
+            label="Existing tags"
+            onChange={(event) => {
+              const customTags = tags.filter((tag) => !availableTags.includes(tag));
+              onTagsChange([...new Set([...customTags, ...event.target.value])]);
+            }}
+            renderValue={(selected) => (
+              <Stack direction="row" spacing={0.5} sx={{ flexWrap: "wrap" }}>
+                {selected.map((tag) => <Chip key={tag} label={tag} size="small" color="secondary" />)}
+              </Stack>
+            )}
+          >
+            {availableTags.length ? availableTags.map((tag) => <MenuItem key={tag} value={tag}>{tag}</MenuItem>) : <MenuItem disabled>No existing tags</MenuItem>}
+          </Select>
+        </FormControl>
+        <Autocomplete
+          freeSolo
+          size="small"
+          options={[]}
+          onChange={(_, value) => {
+            if (typeof value === "string" && value.trim()) onTagsChange([...new Set([...tags, value.trim()])]);
+          }}
+          renderInput={(params) => <TextField {...params} label="Add new tag" placeholder="Work, Ideas…" />}
+          sx={{ minWidth: { sm: 210 } }}
+        />
+      </Stack>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+        Select existing tags from the dropdown or add a new tag.
+      </Typography>
       {audioUrl && <Paper variant="outlined" sx={{ my: 2, p: { xs: 1, md: 1.5 }, borderRadius: 3, bgcolor: "rgba(255,255,255,.72)" }}><audio style={{ width: "100%", display: "block" }} controls src={audioUrl} /></Paper>}
 
-      <Box sx={{ borderTop: 1, borderColor: "divider", py: 3 }}>
+      <Box sx={{ mt: 3, p: { xs: 1.25, md: 2 }, border: 1, borderColor: "divider", borderRadius: 2.5, bgcolor: "rgba(255,255,255,.66)", boxShadow: "0 8px 26px rgba(67,48,125,.04)" }}>
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 1, gap: 1 }}>
-          <Typography variant="overline" sx={{ fontWeight: 800, letterSpacing: ".12em" }}>Transcript</Typography>
+          <Button onClick={onTranscriptToggle} sx={{ justifyContent: "flex-start", px: .5, color: "text.primary", fontWeight: 800, letterSpacing: ".08em" }}>Transcript {transcriptOpen ? "⌃" : "⌄"}</Button>
           <Stack direction="row" spacing={.5} sx={{ flexWrap: "wrap", justifyContent: { xs: "flex-start", sm: "flex-end" } }}>
             <FormControlLabel
               sx={{ mr: 0, "& .MuiFormControlLabel-label": { fontSize: 11 } }}
@@ -67,6 +112,7 @@ export default function EditorView({
               size="small"><Download size={16} /></IconButton>
           </Stack>
         </Stack>
+        <Collapse in={transcriptOpen}>
         {transcriptError && <Alert severity="error" sx={{ mb: 2 }}>{transcriptError}</Alert>}
         {speakerLabels && (
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
@@ -84,12 +130,13 @@ export default function EditorView({
           variant="outlined"
           sx={{ "& .MuiOutlinedInput-root": { borderRadius: 2 } }}
         />
+        </Collapse>
       </Box>
 
-      <Box sx={{ borderTop: 1, borderColor: "divider", py: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-          <Typography variant="overline" sx={{ fontWeight: 800, letterSpacing: ".12em" }}>Summary</Typography>
-          <Stack direction="row" spacing={.5}>
+      <Box sx={{ mt: 2, p: { xs: 1.25, md: 2 }, border: 1, borderColor: "divider", borderRadius: 2.5, bgcolor: "rgba(255,255,255,.66)", boxShadow: "0 8px 26px rgba(67,48,125,.04)" }}>
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 1, gap: 1 }}>
+          <Button onClick={onSummaryToggle} sx={{ justifyContent: "flex-start", px: .5, color: "text.primary", fontWeight: 800, letterSpacing: ".08em" }}>Summary {summaryOpen ? "⌃" : "⌄"}</Button>
+          <Stack direction="row" spacing={.5} sx={{ justifyContent: { xs: "flex-start", sm: "flex-end" } }}>
             <Button
               onClick={onSummarize}
               disabled={isSummarizing}
@@ -103,13 +150,14 @@ export default function EditorView({
           </Stack>
         </Stack>
 
+        <Collapse in={summaryOpen}>
         {isSummarizing && summaryProgress?.label && (
           <Box sx={{ mb: 2 }}><LinearProgress variant="determinate" value={summaryProgress.percent} color="secondary" /><Typography variant="caption" color="text.secondary">{summaryProgress.label}</Typography></Box>
         )}
 
         {showSummaryPreview ? (
           <Box
-            sx={{ lineHeight: 1.75, color: summaryMarkdown.trim() ? "text.primary" : "text.secondary", "& h2": { fontSize: "1.2rem" }, "& p": { mb: 1 } }}
+            sx={{ minHeight: 120, lineHeight: 1.75, color: summaryMarkdown.trim() ? "text.primary" : "text.secondary", "& h2": { fontSize: "1.2rem" }, "& p": { mb: 1 } }}
             dangerouslySetInnerHTML={{
               __html: summaryMarkdown.trim() ? summaryHtml : "A concise summary will appear here.",
             }}
@@ -131,6 +179,7 @@ export default function EditorView({
         <Stack direction="row" spacing={1} sx={{ mt: 2, display: { xs: "none", md: "flex" } }}>
           <Button onClick={onCopySummary} size="small" startIcon={<Copy size={15} />}>Copy summary</Button><Button onClick={onExportSummary} size="small" startIcon={<Download size={15} />}>Export MD</Button><Button onClick={onDelete} size="small" color="error" startIcon={<Trash2 size={15} />}>Delete note</Button>
         </Stack>
+        </Collapse>
       </Box>
 
       <Typography variant="caption" color="text.secondary" sx={{ display: { xs: "none", md: "block" } }}>Saved locally</Typography>

@@ -3,8 +3,8 @@
   "short_name": "LocalJot",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#f7f7f5",
-  "theme_color": "#f7f7f5",
+  "background_color": "#f8f6ff",
+  "theme_color": "#7655d6",
   "description": "Private on-device voice notes and transcription.",
   "icons": [
     {

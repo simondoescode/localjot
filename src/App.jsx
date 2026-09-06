@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
-import { Menu, Settings, Square } from "lucide-react";
+import { ArrowLeft, Download, Settings, Square } from "lucide-react";
 import { AppBar, Box, Button, CssBaseline, Drawer, IconButton, LinearProgress, ThemeProvider, Toolbar, Typography, Chip, CircularProgress, Paper, Stack } from "@mui/material";
 import { createTheme } from "@mui/material/styles";
 import Sidebar from "./components/Sidebar.jsx";
@@ -19,7 +19,7 @@ import { summarizeTranscript } from "./lib/summarize.js";
 marked.setOptions({ breaks: true });
 
 const theme = createTheme({
-  palette: { mode: "light", primary: { main: "#292524" }, secondary: { main: "#6d5bd0", light: "#f0edff" }, background: { default: "#f7f7fb", paper: "#ffffff" }, divider: "#e8e7ef" },
+  palette: { mode: "light", primary: { main: "#33205f" }, secondary: { main: "#7655d6", light: "#eee8ff", dark: "#5633ad" }, background: { default: "#f8f6ff", paper: "#ffffff" }, divider: "#e4dff2" },
   typography: { fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif', button: { textTransform: "none", fontWeight: 650 }, h3: { fontWeight: 800 } },
   shape: { borderRadius: 14 },
   components: {
@@ -36,6 +36,16 @@ function safeId() {
 
 function firstLine(text = "") {
   return text.trim().split(/(?<=[.!?])\s|\n/)[0]?.slice(0, 70) || "";
+}
+
+function titleFromSummary(text = "") {
+  const candidate = text
+    .replace(/^#+\s*/gm, "")
+    .replace(/\*+/g, "")
+    .split(/\n|[.!?]\s/)
+    .map((line) => line.trim())
+    .find(Boolean) || "";
+  return candidate.replace(/[:;,\-]+$/, "").slice(0, 70) || "Untitled note";
 }
 
 function mergeTranscript(previous, next) {
@@ -55,6 +65,12 @@ function mergeTranscript(previous, next) {
   return `${left} ${right}`.trim();
 }
 
+function readRoute() {
+  const value = window.location.hash.replace(/^#\/?/, "");
+  const [page = "notes", id] = value.split("/");
+  return { page, id };
+}
+
 export default function App() {
   const { notes, saveNote, deleteNote } = useNotes();
   const storage = useStorageInfo();
@@ -66,11 +82,18 @@ export default function App() {
 
   const [view, setView] = useState("new"); // new | record | editor
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [route, setRoute] = useState(() => readRoute());
   const [selectedNote, setSelectedNote] = useState(null);
   const [title, setTitle] = useState("");
+  const [recordingPreset, setRecordingPreset] = useState(() => localStorage.getItem("localjot-recording-preset") || "voice-memo");
   const [transcript, setTranscript] = useState("");
   const [summaryMarkdown, setSummaryMarkdown] = useState("");
+  const [tags, setTags] = useState([]);
+  const [noteSearch, setNoteSearch] = useState("");
+  const [activeTag, setActiveTag] = useState("");
   const [showSummaryPreview, setShowSummaryPreview] = useState(true);
+  const [transcriptOpen, setTranscriptOpen] = useState(true);
+  const [summaryOpen, setSummaryOpen] = useState(true);
   const [audioUrl, setAudioUrl] = useState(null);
   const [recordingPreview, setRecordingPreview] = useState(null);
   const [recordError, setRecordError] = useState("");
@@ -79,6 +102,8 @@ export default function App() {
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryProgress, setSummaryProgress] = useState(null);
   const [setupOpen, setSetupOpen] = useState(() => localStorage.getItem("localjot-setup-complete") !== "true");
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   const saveTimerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -86,6 +111,48 @@ export default function App() {
   const selectedNoteRef = useRef(null);
   const processingCancelledRef = useRef(false);
   selectedNoteRef.current = selectedNote;
+
+  const navigate = useCallback((page, id = "") => {
+    const nextHash = `#/${page}${id ? `/${id}` : ""}`;
+    if (window.location.hash !== nextHash) window.history.pushState({}, "", nextHash);
+    setRoute({ page, id });
+  }, []);
+
+  useEffect(() => {
+    const handleRouteChange = () => setRoute(readRoute());
+    window.addEventListener("hashchange", handleRouteChange);
+    window.addEventListener("popstate", handleRouteChange);
+    return () => {
+      window.removeEventListener("hashchange", handleRouteChange);
+      window.removeEventListener("popstate", handleRouteChange);
+    };
+  }, []);
+
+  useEffect(() => {
+    const standalone = window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+    setIsInstalled(standalone);
+    const handlePrompt = (event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+    };
+    const handleInstalled = () => {
+      setInstallPrompt(null);
+      setIsInstalled(true);
+    };
+    window.addEventListener("beforeinstallprompt", handlePrompt);
+    window.addEventListener("appinstalled", handleInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handlePrompt);
+      window.removeEventListener("appinstalled", handleInstalled);
+    };
+  }, []);
+
+  const handleInstall = useCallback(async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  }, [installPrompt]);
 
   const summaryHtml = useMemo(() => (summaryMarkdown.trim() ? marked.parse(summaryMarkdown) : ""), [summaryMarkdown]);
 
@@ -97,11 +164,12 @@ export default function App() {
       title: title.trim() || "Untitled note",
       transcript,
       summaryMarkdown: summaryMarkdown || null,
+      tags,
       updatedAt: Date.now(),
     };
     setSelectedNote(updated);
     await saveNote(updated);
-  }, [title, transcript, summaryMarkdown, saveNote]);
+  }, [title, transcript, summaryMarkdown, tags, saveNote]);
 
   const queueSave = useCallback(() => {
     clearTimeout(saveTimerRef.current);
@@ -119,10 +187,13 @@ export default function App() {
       }
       setSelectedNote(note);
       setTitle(note.title || firstLine(note.transcript) || "Untitled note");
+      setRecordingPreset(note.preset || "voice-memo");
       setTranscript(note.transcript || "");
       setSummaryMarkdown(note.summaryMarkdown || "");
+      setTags(Array.isArray(note.tags) ? note.tags : []);
       setShowSummaryPreview(true);
       setView("editor");
+      navigate("note", note.id);
       setDrawerOpen(false);
       if (currentAudioUrlRef.current) URL.revokeObjectURL(currentAudioUrlRef.current);
       if (note.audioBlob) {
@@ -135,8 +206,15 @@ export default function App() {
       }
       storage.refresh();
     },
-    [persistCurrent, storage]
+    [navigate, persistCurrent, storage]
   );
+
+  useEffect(() => {
+    if (route.page === "note" && route.id && notes.length && selectedNoteRef.current?.id !== route.id) {
+      const note = notes.find((item) => item.id === route.id);
+      if (note) openNote(note);
+    }
+  }, [notes, openNote, route]);
 
   const createNoteFromAudio = useCallback(
     async (blob, recordedDurationMs = 0, suppliedTitle = "") => {
@@ -174,6 +252,8 @@ export default function App() {
           transcript: text,
           title: suppliedTitle || firstLine(text) || "Untitled note",
           summaryMarkdown: null,
+          tags: [],
+          preset: recordingPreset,
         };
         await saveNote(note);
         await openNote(note);
@@ -187,7 +267,7 @@ export default function App() {
         setProcessingLabel("");
       }
     },
-    [models, modelId, saveNote, openNote]
+    [models, modelId, recordingPreset, saveNote, openNote]
   );
 
   const redoTranscript = useCallback(async (enabled = speakerLabels) => {
@@ -266,16 +346,18 @@ export default function App() {
       saveTimerRef.current = null;
       await persistCurrent();
     }
-    if (recorder.micState === "recording") await recorder.stopRecording();
+    if (recorder.micState === "recording" || recorder.micState === "paused") await recorder.stopRecording();
     setSelectedNote(null);
     setSelectedFile(null);
     setView("new");
+    navigate("new");
     setDrawerOpen(false);
-  }, [persistCurrent, recorder]);
+  }, [navigate, persistCurrent, recorder]);
 
   const openRecorder = useCallback(async () => {
     setRecordError("");
     setView("record");
+    navigate("record");
     setDrawerOpen(false);
     if (!(await models.ensureTranscriber())) {
       setView("new");
@@ -284,7 +366,7 @@ export default function App() {
     if (!(await recorder.openMic())) {
       setRecordError("Microphone access was unavailable. Allow microphone access and try again.");
     }
-  }, [models, recorder]);
+  }, [models, navigate, recorder]);
 
   const handleToggleRecord = useCallback(async () => {
     try {
@@ -297,6 +379,12 @@ export default function App() {
       console.error(err);
       setRecordError("Could not start recording. Check that your microphone is available and try again.");
     }
+  }, [recorder]);
+
+  const handleDeviceChange = useCallback(async (deviceId) => {
+    if (recorder.micState === "recording" || recorder.micState === "paused") return;
+    recorder.closeMic();
+    await recorder.openMic(deviceId);
   }, [recorder]);
 
   const handleFileChange = useCallback(
@@ -341,15 +429,20 @@ export default function App() {
       const nextSummary = `## Key points\n\n${text}${
         truncated ? "\n\n*(Summary covers the first part of a very long transcript.)*" : ""
       }`;
+      const currentNote = selectedNoteRef.current;
+      const defaultTitle = firstLine(transcript) || "Untitled note";
+      const shouldImproveTitle = !title.trim() || title.trim() === defaultTitle || title.trim() === "Untitled note";
+      const nextTitle = shouldImproveTitle ? titleFromSummary(text) : title.trim();
       setSummaryMarkdown(nextSummary);
       setShowSummaryPreview(true);
       const updated = {
-        ...selectedNoteRef.current,
+        ...currentNote,
         transcript,
         summaryMarkdown: nextSummary,
-        title: title.trim() || "Untitled note",
+        title: nextTitle,
         updatedAt: Date.now(),
       };
+      setTitle(nextTitle);
       setSelectedNote(updated);
       await saveNote(updated);
     } catch (err) {
@@ -376,7 +469,8 @@ export default function App() {
     await deleteNote(selectedNoteRef.current.id);
     setSelectedNote(null);
     setView("new");
-  }, [deleteNote]);
+    navigate("notes");
+  }, [deleteNote, navigate]);
 
   const handleSidebarRename = useCallback(async (note, nextTitle) => {
     const updated = { ...note, title: nextTitle, updatedAt: Date.now() };
@@ -387,59 +481,80 @@ export default function App() {
     }
   }, [saveNote]);
 
+  const handleTagsChange = useCallback((nextTags) => {
+    setTags(nextTags);
+    queueSave();
+  }, [queueSave]);
+
+  const allTags = useMemo(
+    () => [...new Set(notes.flatMap((note) => (Array.isArray(note.tags) ? note.tags : [])))].sort(),
+    [notes]
+  );
+  const visibleNotes = useMemo(() => {
+    const query = noteSearch.trim().toLowerCase();
+    return notes.filter((note) => {
+      const matchesQuery = !query || `${note.title || ""} ${note.transcript || ""}`.toLowerCase().includes(query);
+      const noteTags = Array.isArray(note.tags) ? note.tags : [];
+      return matchesQuery && (!activeTag || noteTags.includes(activeTag));
+    });
+  }, [notes, noteSearch, activeTag]);
+
   const handleSidebarDelete = useCallback(async (note) => {
     await deleteNote(note.id);
     if (selectedNoteRef.current?.id === note.id) {
       setSelectedNote(null);
       setView("new");
+      navigate("notes");
     }
-  }, [deleteNote]);
+  }, [deleteNote, navigate]);
 
   return (
-    <ThemeProvider theme={theme}><CssBaseline /><SetupWizard open={setupOpen} onComplete={completeSetup} onRequestMic={recorder.openMic} onLoadModels={(speechId, summaryId) => models.ensureTranscriber(speechId).then((loaded) => loaded && models.ensureSummarizer(summaryId))} onModelChange={setModelId} speechModelId={modelId} summaryModelId={summarizerModelId} onSummaryModelChange={setSummarizerModelId} micReady={recorder.micState === "ready"} modelStatus={models.transcriberStatus} summaryStatus={models.summarizerStatus} />    <Box sx={{ minHeight: "100dvh", bgcolor: "background.default", color: "text.primary", backgroundImage: "radial-gradient(circle at 88% 0%, rgba(196,181,253,.18), transparent 28rem)" }}>
+    <ThemeProvider theme={theme}><CssBaseline /><SetupWizard open={setupOpen} onComplete={completeSetup} onRequestMic={recorder.openMic} onLoadModels={(speechId, summaryId) => models.ensureTranscriber(speechId).then((loaded) => loaded && models.ensureSummarizer(summaryId))} onModelChange={setModelId} speechModelId={modelId} summaryModelId={summarizerModelId} onSummaryModelChange={setSummarizerModelId} micReady={recorder.micState === "ready"} modelStatus={models.transcriberStatus} summaryStatus={models.summarizerStatus} />        <Box sx={{ minHeight: "100dvh", bgcolor: "background.default", color: "text.primary", backgroundImage: "radial-gradient(circle at 88% 0%, rgba(167,139,250,.28), transparent 28rem), linear-gradient(145deg, #f8f6ff 0%, #fcfbff 52%, #f1edff 100%)" }}>
       {/* Mobile top bar */}
-      <AppBar position="sticky" color="inherit" elevation={0} sx={{ display: { xs: "block", md: "none" }, borderBottom: 1, borderColor: "rgba(232,231,239,.9)", bgcolor: "rgba(250,250,252,.82)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" }}>
+      <AppBar position="sticky" color="inherit" elevation={0} sx={{ display: route.page === "notes" ? "none" : "block", borderBottom: 1, borderColor: "rgba(232,231,239,.9)", bgcolor: "rgba(250,250,252,.82)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)" }}>
         <Toolbar sx={{ justifyContent: "space-between", minHeight: 60, px: 1.25, paddingTop: "env(safe-area-inset-top)" }}>
-        <IconButton
-          onClick={() => setDrawerOpen(true)}
-          aria-label="Open notes"
-          size="large">
-          <Menu size={20} />
+        <IconButton onClick={() => navigate("notes")} aria-label="Back to notes" size="large">
+          <ArrowLeft size={20} />
         </IconButton>
-        <Typography fontWeight={800} sx={{ letterSpacing: "-.04em", fontSize: "1.05rem" }}>LocalJot</Typography>
+        <Typography fontWeight={800} noWrap sx={{ maxWidth: "70%", letterSpacing: "-.04em", fontSize: "1.05rem" }}>
+          {route.page === "note" ? (selectedNote?.title || "Note") : route.page === "new" ? "New note" : route.page === "record" ? "Record" : "Settings"}
+        </Typography>
         <IconButton
-          onClick={() => setModelSettingsOpen((o) => !o)}
+          onClick={() => navigate("settings")}
           aria-label="Model settings"
           size="large">
           <Settings size={18} />
         </IconButton>
         </Toolbar></AppBar>
 
-      <Box sx={{ display: { md: "grid" }, minHeight: { md: "calc(100dvh - 1px)" }, gridTemplateColumns: "292px minmax(0,1fr)" }}>
-        {/* Desktop sidebar */}
-        <Box component="aside" sx={{ display: { xs: "none", md: "flex" }, borderRight: 1, borderColor: "divider", bgcolor: "rgba(245,245,244,.6)", minHeight: "100%" }}>
-          <Sidebar notes={notes} selectedId={selectedNote?.id} onSelect={openNote} onNewNote={newNote} onRename={handleSidebarRename} onDelete={handleSidebarDelete} storage={storage} />
-        </Box>
-
-        {/* Mobile drawer */}
-        <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={{ display: { md: "none" } }}>
-          <Box sx={{ width: "min(88vw, 340px)", height: "100%", bgcolor: "background.paper", backgroundImage: "linear-gradient(180deg, #fbfaff 0%, #ffffff 30%)" }}>
-          <Box sx={{ height: "100%", overflow: "hidden", paddingTop: "env(safe-area-inset-top)" }}>
-            <Sidebar
-              notes={notes}
-              selectedId={selectedNote?.id}
-              onSelect={openNote}
-              onNewNote={newNote}
-              onRename={handleSidebarRename}
-              onDelete={handleSidebarDelete}
-              storage={storage}
-              onClose={() => setDrawerOpen(false)}
-            />
-          </Box>
-          </Box>
-        </Drawer>
-
-        <Box component="main" sx={{ width: "100%", minWidth: 0, px: { xs: 1.25, sm: 3, md: "4vw" }, py: { xs: 1.25, md: 4 }, pb: { xs: "calc(80px + env(safe-area-inset-bottom))", md: 4 }, background: "linear-gradient(145deg, #f7f7fb 0%, #fbfbfd 52%, #f5f3ff 100%)" }}>
+      <Box sx={{ display: { md: "grid" }, minHeight: { md: "calc(100dvh - 1px)" }, gridTemplateColumns: route.page === "notes" ? "minmax(0,1fr)" : "minmax(0,1fr)" }}>
+        <Box component="main" sx={{ width: "100%", minWidth: 0, px: { xs: 1.25, sm: 3, md: "4vw" }, py: { xs: 1.25, md: 4 }, pb: { xs: "calc(80px + env(safe-area-inset-bottom))", md: 4 }, background: "linear-gradient(145deg, rgba(248,246,255,.96) 0%, rgba(252,251,255,.98) 52%, rgba(241,237,255,.96) 100%)" }}>
+          {route.page === "notes" ? (
+            <Sidebar notes={visibleNotes} totalNotes={notes.length} selectedId={selectedNote?.id} onSelect={openNote} onNewNote={newNote} onRename={handleSidebarRename} onDelete={handleSidebarDelete} storage={storage} search={noteSearch} onSearchChange={setNoteSearch} activeTag={activeTag} onTagChange={setActiveTag} tags={allTags} />
+          ) : (
+          <>
+          <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+            <Button onClick={() => navigate("notes")} size="small" startIcon={<ArrowLeft size={16} />}>Notes</Button>
+            <Typography variant="caption" color="text.secondary" sx={{ textTransform: "capitalize" }}>
+              {route.page === "note" ? "Note" : route.page === "new" ? "New note" : route.page}
+            </Typography>
+          </Stack>
+          {installPrompt && !isInstalled && (
+            <Paper
+              variant="outlined"
+              role="status"
+              sx={{ mb: 2, p: 1.25, maxWidth: 720, borderRadius: 3, bgcolor: "rgba(255,255,255,.8)", borderColor: "rgba(109,91,208,.24)" }}
+            >
+              <Stack direction="row" alignItems="center" spacing={1.25}>
+                <Download size={19} color="#6d5bd0" />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={750}>Install LocalJot</Typography>
+                  <Typography variant="caption" color="text.secondary">Open your private notes faster, even offline.</Typography>
+                </Box>
+                <Button onClick={handleInstall} variant="contained" color="secondary" size="small">Install</Button>
+              </Stack>
+            </Paper>
+          )}
           {processingLabel && (
             <Paper variant="outlined" role="status" aria-live="polite" sx={{ mb: 2, px: 1.5, py: 1, maxWidth: 560 }}>
               <Stack direction="row" alignItems="center" spacing={1.25}>
@@ -480,7 +595,7 @@ export default function App() {
           </Box>
 
           <ModelSettings
-            open={modelSettingsOpen}
+            open={modelSettingsOpen || route.page === "settings"}
             onToggle={setModelSettingsOpen}
             modelId={modelId}
             onModelChange={setModelId}
@@ -494,22 +609,32 @@ export default function App() {
             }}
           />
 
-          {view === "new" && (
+          {route.page === "new" && (
             <NewNoteView onRecord={openRecorder} onUploadClick={() => fileInputRef.current?.click()} error={recordError} />
           )}
 
-          {view === "record" && (
+          {route.page === "record" && (
             <RecordView
               micState={recorder.micState}
               elapsedMs={recorder.elapsedMs}
               waveHeights={recorder.waveHeights}
               onToggleRecord={handleToggleRecord}
+              onPause={recorder.pauseRecording}
+              onResume={recorder.resumeRecording}
+              inputDevices={recorder.inputDevices}
+              onDeviceChange={handleDeviceChange}
+              isPaused={recorder.isPaused}
               error={recordError}
               recordingPreview={recordingPreview}
+              preset={recordingPreset}
+              onPresetChange={(preset) => {
+                setRecordingPreset(preset);
+                localStorage.setItem("localjot-recording-preset", preset);
+              }}
             />
           )}
 
-          {view === "editor" && selectedNote && (
+          {route.page === "note" && selectedNote && (
             <EditorView
               note={selectedNote}
               title={title}
@@ -529,7 +654,15 @@ export default function App() {
                 setSummaryMarkdown(v);
                 queueSave();
               }}
+              tags={tags}
+              onTagsChange={handleTagsChange}
+              availableTags={allTags}
+              preset={recordingPreset}
               onToggleSummaryView={() => setShowSummaryPreview((s) => !s)}
+              transcriptOpen={transcriptOpen}
+              onTranscriptToggle={() => setTranscriptOpen((open) => !open)}
+              summaryOpen={summaryOpen}
+              onSummaryToggle={() => setSummaryOpen((open) => !open)}
               audioUrl={audioUrl}
               onSummarize={handleSummarize}
               isSummarizing={isSummarizing}
@@ -558,6 +691,8 @@ export default function App() {
             style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", border: 0 }}
             onChange={handleFileChange}
           />
+          </>
+          )}
         </Box>
       </Box>
     </Box></ThemeProvider>

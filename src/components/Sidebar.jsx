@@ -1,6 +1,7 @@
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, IconButton, LinearProgress, List, ListItemButton, ListItemText, Stack, TextField, Typography } from "@mui/material";
+import { Box, Button, Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider, FormControl, IconButton, InputAdornment, InputLabel, LinearProgress, List, ListItemButton, ListItemText, MenuItem, Select, Stack, TextField, Typography } from "@mui/material";
+import packageInfo from "../../package.json";
 
 const iconUrl = `${import.meta.env.BASE_URL}icon.svg`;
 
@@ -9,7 +10,7 @@ function noteTitle(note) {
   return note.title || firstLine || "Untitled note";
 }
 
-export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRename, onDelete, storage, onClose }) {
+export default function Sidebar({ notes, totalNotes = notes.length, selectedId, onSelect, onNewNote, onRename, onDelete, storage, onClose, search, onSearchChange, activeTag, onTagChange, tags = [] }) {
   const [renameNote, setRenameNote] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [deleteNote, setDeleteNote] = useState(null);
@@ -44,9 +45,17 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRena
           </IconButton>
         )}
       </Stack>
-      <Button onClick={onNewNote} variant="contained" startIcon={<Plus size={18} />} sx={{ minHeight: 46, justifyContent: "flex-start", borderRadius: 2.5, fontWeight: 700, px: 1.5, bgcolor: "#4c1d95", boxShadow: "0 8px 18px rgba(76,29,149,.18)", "&:hover": { bgcolor: "#3b0764", boxShadow: "0 10px 22px rgba(76,29,149,.24)" } }}>New note</Button>
-      <Stack direction="row" justifyContent="space-between" sx={{ px: 1, pt: 2.5, pb: 1 }}>
-        <Typography variant="overline" color="text.secondary" sx={{ fontWeight: 700, letterSpacing: ".12em" }}>Notes</Typography><Chip label={notes.length} size="small" />
+      <Button onClick={onNewNote} variant="contained" color="secondary" startIcon={<Plus size={18} />} sx={{ minHeight: 46, justifyContent: "flex-start", borderRadius: 2.5, fontWeight: 700, px: 1.5, boxShadow: "0 8px 18px rgba(91,55,173,.22)", "&:hover": { boxShadow: "0 10px 22px rgba(91,55,173,.28)" } }}>New note</Button>
+      <TextField value={search} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search notes" size="small" fullWidth sx={{ mt: 2, "& .MuiOutlinedInput-root": { borderRadius: 2.5, bgcolor: "rgba(255,255,255,.72)" } }} InputProps={{ startAdornment: <InputAdornment position="start"><Search size={17} /></InputAdornment> }} />
+      <Stack direction="row" spacing={1} sx={{ px: 0, pt: 1.5, pb: 1 }}>
+        <FormControl size="small" fullWidth>
+          <InputLabel>Tag</InputLabel>
+          <Select value={activeTag} label="Tag" onChange={(event) => onTagChange(event.target.value)}>
+            <MenuItem value="">All tags</MenuItem>
+            {tags.map((tag) => <MenuItem key={tag} value={tag}>{tag}</MenuItem>)}
+          </Select>
+        </FormControl>
+        <Chip label={`${notes.length}/${totalNotes}`} size="small" sx={{ alignSelf: "center" }} />
       </Stack>
       <List
         disablePadding
@@ -64,9 +73,14 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRena
             key={note.id}
             onClick={() => onSelect(note)}
             selected={note.id === selectedId}
-            sx={{ borderRadius: 2, mb: .5, px: 1.25, py: 1.1, "&.Mui-selected": { bgcolor: "#f0edff", borderRadius: 0, borderLeft: 3, borderColor: "secondary.main", "&:hover": { bgcolor: "#ebe7ff" } }, "&:hover .note-actions": { opacity: 1 } }}
+            sx={{ borderRadius: 2, mb: .5, px: 1.25, py: 1.1, "&.Mui-selected": { bgcolor: "#eee8ff", borderRadius: 0, borderLeft: 3, borderColor: "secondary.main", "&:hover": { bgcolor: "#e5dcff" } }, "&:hover .note-actions": { opacity: 1 } }}
           >
-            <ListItemText primary={noteTitle(note)} primaryTypographyProps={{ noWrap: true, fontWeight: 700, fontSize: 14 }} />
+            <ListItemText
+              primary={noteTitle(note)}
+              secondary={Array.isArray(note.tags) && note.tags.length ? note.tags.join(" · ") : null}
+              primaryTypographyProps={{ noWrap: true, fontWeight: 700, fontSize: 14 }}
+              secondaryTypographyProps={{ noWrap: true, fontSize: 11 }}
+            />
             <Stack className="note-actions" direction="row" sx={{ opacity: { xs: 1, md: 0 }, transition: "opacity .15s" }}>
               <IconButton size="small" aria-label={`Rename ${noteTitle(note)}`} onClick={(event) => { event.stopPropagation(); setRenameNote(note); setRenameValue(noteTitle(note)); }}>
                 <Pencil size={15} />
@@ -98,6 +112,9 @@ export default function Sidebar({ notes, selectedId, onSelect, onNewNote, onRena
           />
         </Box>
       </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ px: 1, pt: 1.5, fontSize: 11 }}>
+        Version {packageInfo.version}
+      </Typography>
       <Dialog open={Boolean(renameNote)} onClose={() => setRenameNote(null)} fullWidth maxWidth="xs">
         <DialogTitle>Rename note</DialogTitle>
         <DialogContent><TextField autoFocus fullWidth label="Note name" value={renameValue} onChange={(event) => setRenameValue(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") submitRename(); }} sx={{ mt: 1 }} /></DialogContent>
