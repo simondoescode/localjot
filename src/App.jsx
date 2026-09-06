@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { marked } from "marked";
 import { Menu, X, Settings } from "lucide-react";
+import { AppBar, Box, CssBaseline, Drawer, IconButton, ThemeProvider, Toolbar, Typography, Chip } from "@mui/material";
+import { createTheme } from "@mui/material/styles";
 import Sidebar from "./components/Sidebar.jsx";
 import ModelSettings from "./components/ModelSettings.jsx";
+import SetupWizard from "./components/SetupWizard.jsx";
 import NewNoteView from "./components/NewNoteView.jsx";
 import RecordView from "./components/RecordView.jsx";
 import EditorView from "./components/EditorView.jsx";
@@ -14,6 +17,13 @@ import { chunkAudio, decodeAudio } from "./lib/audio.js";
 import { summarizeTranscript } from "./lib/summarize.js";
 
 marked.setOptions({ breaks: true });
+
+const theme = createTheme({
+  palette: { mode: "light", primary: { main: "#292524" }, secondary: { main: "#7c3aed", light: "#ede9fe" }, background: { default: "#fafaf9", paper: "#ffffff" } },
+  typography: { fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif', button: { textTransform: "none" } },
+  shape: { borderRadius: 12 },
+  components: { MuiButton: { defaultProps: { disableElevation: true } }, MuiCard: { styleOverrides: { root: { boxShadow: "0 8px 30px rgba(28,25,23,.04)" } } } },
+});
 
 function safeId() {
   return crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -60,6 +70,7 @@ export default function App() {
   const [processingLabel, setProcessingLabel] = useState("");
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryProgress, setSummaryProgress] = useState(null);
+  const [setupOpen, setSetupOpen] = useState(() => localStorage.getItem("localjot-setup-complete") !== "true");
 
   const saveTimerRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -188,6 +199,12 @@ export default function App() {
 
   const recorder = useRecorder({ onStop: handleRecorderStop });
 
+  const completeSetup = useCallback(() => {
+    localStorage.setItem("localjot-setup-complete", "true");
+    setSetupOpen(false);
+    recorder.closeMic();
+  }, [recorder]);
+
   useEffect(
     () => () => {
       if (recordingPreview) URL.revokeObjectURL(recordingPreview.url);
@@ -291,63 +308,73 @@ export default function App() {
     setView("new");
   }, [deleteNote]);
 
+  const handleSidebarRename = useCallback(async (note, nextTitle) => {
+    const updated = { ...note, title: nextTitle, updatedAt: Date.now() };
+    await saveNote(updated);
+    if (selectedNoteRef.current?.id === note.id) {
+      setSelectedNote(updated);
+      setTitle(nextTitle);
+    }
+  }, [saveNote]);
+
+  const handleSidebarDelete = useCallback(async (note) => {
+    await deleteNote(note.id);
+    if (selectedNoteRef.current?.id === note.id) {
+      setSelectedNote(null);
+      setView("new");
+    }
+  }, [deleteNote]);
+
   return (
-    <div className="min-h-dvh bg-paper text-ink">
+    <ThemeProvider theme={theme}><CssBaseline /><SetupWizard open={setupOpen} onComplete={completeSetup} onRequestMic={recorder.openMic} onLoadModel={models.ensureTranscriber} micReady={recorder.micState === "ready"} modelStatus={models.transcriberStatus} /><Box sx={{ minHeight: "100dvh", bgcolor: "background.default", color: "text.primary" }}>
       {/* Mobile top bar */}
-      <div className="sticky top-0 z-30 flex items-center justify-between border-b border-stone-200/80 bg-paper/90 px-2 py-2 backdrop-blur-xl [padding-top:env(safe-area-inset-top)] md:hidden">
-        <button
+      <AppBar position="sticky" color="inherit" elevation={0} sx={{ display: { xs: "block", md: "none" }, borderBottom: 1, borderColor: "divider", bgcolor: "rgba(250,250,249,.9)", backdropFilter: "blur(16px)" }}>
+        <Toolbar sx={{ justifyContent: "space-between", minHeight: 56 }}>
+        <IconButton
           onClick={() => setDrawerOpen(true)}
           aria-label="Open notes"
-          className="grid h-11 w-11 place-items-center rounded-lg text-ink active:bg-stone-200"
-        >
+          size="large">
           <Menu size={20} />
-        </button>
-        <b className="text-base tracking-tight">Jot</b>
-        <button
+        </IconButton>
+        <Typography fontWeight={800}>Jot</Typography>
+        <IconButton
           onClick={() => setModelSettingsOpen((o) => !o)}
           aria-label="Model settings"
-          className="grid h-11 w-11 place-items-center rounded-lg text-ink active:bg-stone-200"
-        >
+          size="large">
           <Settings size={18} />
-        </button>
-      </div>
+        </IconButton>
+        </Toolbar></AppBar>
 
-      <div className="md:grid md:min-h-dvh md:grid-cols-[292px_minmax(0,1fr)]">
+      <Box sx={{ display: { md: "grid" }, minHeight: { md: "calc(100dvh - 1px)" }, gridTemplateColumns: "292px minmax(0,1fr)" }}>
         {/* Desktop sidebar */}
-        <aside className="hidden border-r border-stone-200/80 bg-stone-100/60 md:flex md:min-h-dvh md:flex-col">
-          <Sidebar notes={notes} selectedId={selectedNote?.id} onSelect={openNote} onNewNote={newNote} storage={storage} />
-        </aside>
+        <Box component="aside" sx={{ display: { xs: "none", md: "flex" }, borderRight: 1, borderColor: "divider", bgcolor: "rgba(245,245,244,.6)", minHeight: "100%" }}>
+          <Sidebar notes={notes} selectedId={selectedNote?.id} onSelect={openNote} onNewNote={newNote} onRename={handleSidebarRename} onDelete={handleSidebarDelete} storage={storage} />
+        </Box>
 
         {/* Mobile drawer */}
-        {drawerOpen && (
-          <div className="fixed inset-0 z-40 md:hidden">
-            <div className="absolute inset-0 bg-stone-950/30 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
-            <div className="absolute inset-y-0 left-0 flex w-[85vw] max-w-80 flex-col bg-stone-50 shadow-2xl [padding-top:env(safe-area-inset-top)]">
-              <div className="flex justify-end px-2 pt-2">
-                <button
+        <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} sx={{ display: { md: "none" } }}>
+          <Box sx={{ width: "min(85vw, 320px)", height: "100%", bgcolor: "background.paper" }}>
+              <Box sx={{ display: "flex", justifyContent: "flex-end", p: 1 }}>
+                <IconButton
                   onClick={() => setDrawerOpen(false)}
                   aria-label="Close notes"
-                  className="grid h-11 w-11 place-items-center rounded-lg active:bg-stone-200"
-                >
+                  size="large">
                   <X size={20} />
-                </button>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <Sidebar notes={notes} selectedId={selectedNote?.id} onSelect={openNote} onNewNote={newNote} storage={storage} />
-              </div>
-            </div>
-          </div>
-        )}
+                </IconButton>
+              </Box>
+              <Box sx={{ height: "calc(100% - 64px)", overflow: "hidden" }}>
+                <Sidebar notes={notes} selectedId={selectedNote?.id} onSelect={openNote} onNewNote={newNote} onRename={handleSidebarRename} onDelete={handleSidebarDelete} storage={storage} />
+              </Box>
+          </Box>
+        </Drawer>
 
-        <main className="w-full max-w-5xl px-4 py-4 md:px-[7vw] md:py-7">
+        <Box component="main" sx={{ width: "100%", maxWidth: 1100, px: { xs: 2, md: "7vw" }, py: { xs: 2, md: 4 } }}>
           {processingLabel && (
-            <div className="mb-3 w-fit rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-medium text-violet-700 shadow-sm">
-              {processingLabel}
-            </div>
+            <Chip size="small" color="secondary" variant="outlined" label={processingLabel} sx={{ mb: 2 }} />
           )}
-          <div className="mb-6 hidden items-center justify-between md:mb-11 md:flex">
-            <span className="text-[13px] text-stone-500">Private · on-device transcription</span>
-          </div>
+          <Box sx={{ mb: { md: 8 }, display: { xs: "none", md: "block" } }}>
+            <Typography variant="body2" color="text.secondary">Private · on-device transcription</Typography>
+          </Box>
 
           <ModelSettings
             open={modelSettingsOpen}
@@ -412,11 +439,11 @@ export default function App() {
             type="file"
             accept="audio/*,video/*"
             aria-label="Choose an audio file"
-            className="sr-only"
+            style={{ position: "absolute", width: 1, height: 1, padding: 0, margin: -1, overflow: "hidden", clip: "rect(0,0,0,0)", whiteSpace: "nowrap", border: 0 }}
             onChange={handleFileChange}
           />
-        </main>
-      </div>
-    </div>
+        </Box>
+      </Box>
+    </Box></ThemeProvider>
   );
 }

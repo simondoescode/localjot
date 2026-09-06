@@ -23,9 +23,11 @@ export function useModels(modelId) {
         }
       });
       setTranscriberStatus({ state: "ready", progress: 100, label: "Speech model ready — it stays on this device." });
+      return true;
     } catch (err) {
       console.error(err);
       setTranscriberStatus({ state: "error", progress: 0, label: "Could not load the speech model. Check your connection." });
+      return false;
     }
   }, [modelId]);
 

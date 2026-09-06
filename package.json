@@ -13,7 +13,10 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@huggingface/transformers": "^3.8.1",
+    "@mui/material": "^9.4.0",
     "lucide-react": "^0.383.0",
     "marked": "^12.0.2",
     "react": "^18.3.1",

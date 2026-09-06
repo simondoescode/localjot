@@ -12,6 +12,8 @@ export function useRecorder({ onStop }) {
   const sourceRef = useRef(null);
   const workletRef = useRef(null);
   const silentOutputRef = useRef(null);
+  const analyserRef = useRef(null);
+  const analyserDataRef = useRef(null);
   const chunksRef = useRef([]);
   const timerRef = useRef(null);
   const startedAtRef = useRef(0);
@@ -47,9 +49,28 @@ export function useRecorder({ onStop }) {
     }
   }, []);
 
+  const closeMic = useCallback(() => {
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+    setMicState("idle");
+  }, []);
+
   const animateWave = useCallback(() => {
     if (!recordingRef.current) return;
-    setWaveHeights(Array.from({ length: WAVE_BARS }, () => 4 + Math.random() * 20));
+    const analyser = analyserRef.current;
+    const data = analyserDataRef.current;
+    if (analyser && data) {
+      analyser.getFloatTimeDomainData(data);
+      const bucketSize = Math.max(1, Math.floor(data.length / WAVE_BARS));
+      const heights = Array.from({ length: WAVE_BARS }, (_, index) => {
+        let peak = 0;
+        const start = index * bucketSize;
+        const end = Math.min(data.length, start + bucketSize);
+        for (let sample = start; sample < end; sample += 1) peak = Math.max(peak, Math.abs(data[sample]));
+        return Math.min(26, 4 + peak * 44);
+      });
+      setWaveHeights(heights);
+    }
     animationRef.current = requestAnimationFrame(animateWave);
   }, []);
 
@@ -82,6 +103,10 @@ export function useRecorder({ onStop }) {
       URL.revokeObjectURL(workletUrl);
     }
     const source = context.createMediaStreamSource(streamRef.current);
+    const analyser = context.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.72;
+    const analyserData = new Float32Array(analyser.fftSize);
     const worklet = new AudioWorkletNode(context, "localjot-capture", {
       numberOfInputs: 1,
       numberOfOutputs: 1,
@@ -91,6 +116,7 @@ export function useRecorder({ onStop }) {
     silentOutput.gain.value = 0.001;
     chunksRef.current = [];
     worklet.port.onmessage = (event) => chunksRef.current.push(event.data);
+    source.connect(analyser);
     source.connect(worklet);
     worklet.connect(silentOutput);
     silentOutput.connect(context.destination);
@@ -103,6 +129,8 @@ export function useRecorder({ onStop }) {
     sourceRef.current = source;
     workletRef.current = worklet;
     silentOutputRef.current = silentOutput;
+    analyserRef.current = analyser;
+    analyserDataRef.current = analyserData;
     recordingRef.current = true;
     startedAtRef.current = Date.now();
     setElapsedMs(0);
@@ -121,6 +149,7 @@ export function useRecorder({ onStop }) {
     const stoppedAt = Date.now();
     await new Promise((resolve) => setTimeout(resolve, 150));
     sourceRef.current?.disconnect();
+    analyserRef.current?.disconnect();
     workletRef.current?.disconnect();
     silentOutputRef.current?.disconnect();
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -130,6 +159,8 @@ export function useRecorder({ onStop }) {
     await context?.close();
     contextRef.current = null;
     sourceRef.current = null;
+    analyserRef.current = null;
+    analyserDataRef.current = null;
     workletRef.current = null;
     silentOutputRef.current = null;
     const length = chunksRef.current.reduce((total, chunk) => total + chunk.length, 0);
@@ -159,13 +190,16 @@ export function useRecorder({ onStop }) {
       clearInterval(timerRef.current);
       cancelAnimationFrame(animationRef.current);
       sourceRef.current?.disconnect();
+      analyserRef.current?.disconnect();
       workletRef.current?.disconnect();
       silentOutputRef.current?.disconnect();
       streamRef.current?.getTracks().forEach((track) => track.stop());
       contextRef.current?.close();
+      analyserRef.current = null;
+      analyserDataRef.current = null;
     },
     []
   );
 
-  return { micState, elapsedMs, waveHeights, openMic, startRecording, stopRecording };
+  return { micState, elapsedMs, waveHeights, openMic, closeMic, startRecording, stopRecording };
 }

@@ -1,4 +1,5 @@
 import { Square } from "lucide-react";
+import { Alert, Box, Card, LinearProgress, Stack, Typography } from "@mui/material";
 
 function fmt(ms) {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -18,37 +19,35 @@ export default function RecordView({ micState, elapsedMs, waveHeights, onToggleR
   const isRecording = micState === "recording";
 
   return (
-    <section className="mx-auto mt-[8vh] max-w-xl text-center">
-      <h1 className="text-3xl font-bold tracking-tight">Recording a note</h1>
-      <div className="mt-5 text-5xl tracking-tighter tabular-nums">{fmt(elapsedMs)}</div>
-      <div className="min-h-6 text-stone-500">{STATUS_LABEL[micState]}</div>
+    <Box component="section" sx={{ mx: "auto", mt: { xs: 7, md: 12 }, maxWidth: 560, textAlign: "center" }}>
+      <Typography variant="h3" sx={{ fontWeight: 800, letterSpacing: "-.04em", fontSize: { xs: "2rem", md: "2.4rem" } }}>Recording a note</Typography>
+      <Typography sx={{ mt: 3, fontSize: "3.5rem", letterSpacing: "-.06em", fontVariantNumeric: "tabular-nums" }}>{fmt(elapsedMs)}</Typography>
+      <Typography color="text.secondary" sx={{ minHeight: 26 }}>{STATUS_LABEL[micState]}</Typography>
       <button
         onClick={onToggleRecord}
         disabled={micState !== "ready" && micState !== "recording"}
         aria-label={isRecording ? "Stop recording" : "Start recording"}
-        className={`my-6 grid h-[88px] w-[88px] place-items-center rounded-full text-white shadow-xl transition disabled:opacity-60 ${
-          isRecording ? "bg-rose-600 shadow-rose-300/40" : "bg-accent shadow-violet-300/40"
-        }`}
+        style={{ margin: "24px auto", width: 88, height: 88, borderRadius: "50%", border: 0, color: "white", background: isRecording ? "#e11d48" : "#7c3aed", boxShadow: isRecording ? "0 12px 30px #fda4af" : "0 12px 30px #c4b5fd", cursor: "pointer" }}
       >
-        {isRecording ? <Square size={28} fill="currentColor" /> : <span className="text-3xl">●</span>}
+        {isRecording ? <Square size={28} fill="currentColor" /> : <span style={{ fontSize: "1.875rem" }}>●</span>}
       </button>
-      <div className="text-sm text-stone-500">Tap to start, then tap again to finish</div>
-      <div className="mt-4 flex h-6 items-center justify-center gap-[3px]">
+      <Typography variant="body2" color="text.secondary">Tap to start, then tap again to finish</Typography>
+      <Stack direction="row" sx={{ mt: 2, height: 24, justifyContent: "center", alignItems: "center", gap: "3px" }}>
         {waveHeights.map((h, i) => (
-          <i key={i} className="w-[3px] rounded-full bg-violet-300" style={{ height: `${h}px`, transition: "height .08s" }} />
+          <i key={i} style={{ width: 3, borderRadius: 99, background: "#c4b5fd", height: `${h}px`, transition: "height .08s" }} />
         ))}
-      </div>
-      {error && <div className="mt-3 text-sm text-rose-700">{error}</div>}
+      </Stack>
+      {error && <Alert severity="error" sx={{ mt: 2, textAlign: "left" }}>{error}</Alert>}
       {recordingPreview && (
-        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-stone-200 bg-white p-4 text-left shadow-sm">
-          <div className="text-sm font-semibold text-stone-800">Latest recording</div>
-          <audio className="mt-3 w-full" controls src={recordingPreview.url} />
-          <div className="mt-2 text-xs leading-5 text-stone-500">
+        <Card variant="outlined" sx={{ mx: "auto", mt: 3, maxWidth: 420, p: 2, textAlign: "left", borderRadius: 3 }}>
+          <Typography variant="subtitle2">Latest recording</Typography>
+          <audio style={{ marginTop: 12, width: "100%" }} controls src={recordingPreview.url} />
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, lineHeight: 1.6 }}>
             {(recordingPreview.size / 1024).toFixed(1)} KB · {recordingPreview.type || "unknown format"} · peak{" "}
             {recordingPreview.peak?.toFixed(5) || "0.00000"} · RMS {recordingPreview.rms?.toFixed(5) || "0.00000"}
-          </div>
-        </div>
+          </Typography>
+        </Card>
       )}
-    </section>
+    </Box>
   );
 }
