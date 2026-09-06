@@ -10,7 +10,7 @@ import { useNotes } from "./hooks/useNotes.js";
 import { useModels } from "./hooks/useModels.js";
 import { useRecorder } from "./hooks/useRecorder.js";
 import { useStorageInfo } from "./hooks/useStorageInfo.js";
-import { decodeAudio } from "./lib/audio.js";
+import { chunkAudio, decodeAudio } from "./lib/audio.js";
 import { summarizeTranscript } from "./lib/summarize.js";
 
 marked.setOptions({ breaks: true });
@@ -21,6 +21,23 @@ function safeId() {
 
 function firstLine(text = "") {
   return text.trim().split(/(?<=[.!?])\s|\n/)[0]?.slice(0, 70) || "";
+}
+
+function mergeTranscript(previous, next) {
+  const left = previous.trim();
+  const right = next.trim();
+  if (!left) return right;
+  if (!right) return left;
+
+  const leftWords = left.split(/\s+/);
+  const rightWords = right.split(/\s+/);
+  const maxOverlap = Math.min(12, leftWords.length, rightWords.length);
+  for (let size = maxOverlap; size > 0; size -= 1) {
+    const leftTail = leftWords.slice(-size).join(" ").toLowerCase().replace(/[.,!?]+$/g, "");
+    const rightHead = rightWords.slice(0, size).join(" ").toLowerCase().replace(/[.,!?]+$/g, "");
+    if (leftTail === rightHead) return `${left} ${rightWords.slice(size).join(" ")}`.trim();
+  }
+  return `${left} ${right}`.trim();
 }
 
 export default function App() {
@@ -113,12 +130,15 @@ export default function App() {
       }
       try {
         const { audio, durationMs } = await decodeAudio(blob);
-        const result = await models.transcriberRef.current(audio, {
-          chunk_length_s: 30,
-          stride_length_s: 5,
-          return_timestamps: false,
-        });
-        const text = (result?.text || "").trim();
+        const audioChunks = chunkAudio(audio);
+        let text = "";
+        for (let index = 0; index < audioChunks.length; index += 1) {
+          setProcessingLabel(`Transcribing part ${index + 1} of ${audioChunks.length}`);
+          const result = await models.transcriberRef.current(audioChunks[index], {
+            return_timestamps: false,
+          });
+          text = mergeTranscript(text, result?.text || "");
+        }
         const note = {
           id: safeId(),
           createdAt: Date.now(),
@@ -134,7 +154,8 @@ export default function App() {
         await openNote(note);
       } catch (err) {
         console.error(err);
-        setRecordError("Transcription failed. Try a shorter audio file or reload the speech model.");
+        const detail = err instanceof Error && err.message ? ` (${err.message.slice(0, 140)})` : "";
+        setRecordError(`Transcription failed${detail}`);
         setView("new");
       } finally {
         setProcessingLabel("");

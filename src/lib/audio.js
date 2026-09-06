@@ -19,6 +19,34 @@ export function makeWav(samples, sampleRate) {
   return new Blob([buffer], { type: "audio/wav" });
 }
 
+function normalizeSpeech(samples) {
+  let peak = 0;
+  let sumSquares = 0;
+  for (const sample of samples) {
+    const absolute = Math.abs(sample);
+    peak = Math.max(peak, absolute);
+    sumSquares += sample * sample;
+  }
+  const rms = Math.sqrt(sumSquares / Math.max(1, samples.length));
+  if (peak < 0.005 || rms < 0.0005) return samples;
+
+  const gain = Math.min(8, 0.9 / peak);
+  if (gain <= 1.05) return samples;
+  return Float32Array.from(samples, (sample) => Math.max(-1, Math.min(1, sample * gain)));
+}
+
+export function chunkAudio(samples, sampleRate = 16000, chunkSeconds = 20, overlapSeconds = 2) {
+  const chunkSize = Math.max(1, Math.floor(sampleRate * chunkSeconds));
+  const overlap = Math.min(chunkSize - 1, Math.floor(sampleRate * overlapSeconds));
+  const step = chunkSize - overlap;
+  const chunks = [];
+
+  for (let start = 0; start < samples.length; start += step) {
+    chunks.push(samples.slice(start, Math.min(samples.length, start + chunkSize)));
+  }
+  return chunks;
+}
+
 // Decodes any audio/video blob to mono 16kHz Float32 samples (what the
 // Whisper pipeline expects), resampling only when the source isn't already
 // 16kHz.
@@ -32,7 +60,7 @@ export async function decodeAudio(blob) {
       for (let i = 0; i < source.length; i++) mono[i] += source[i] / decoded.numberOfChannels;
     }
     if (decoded.sampleRate === 16000) {
-      return { audio: mono, durationMs: Math.round(decoded.duration * 1000) };
+      return { audio: normalizeSpeech(mono), durationMs: Math.round(decoded.duration * 1000) };
     }
     const length = Math.max(1, Math.ceil(decoded.duration * 16000));
     const offline = new OfflineAudioContext(1, length, 16000);
@@ -43,7 +71,10 @@ export async function decodeAudio(blob) {
     source.connect(offline.destination);
     source.start();
     const rendered = await offline.startRendering();
-    return { audio: rendered.getChannelData(0), durationMs: Math.round(decoded.duration * 1000) };
+    return {
+      audio: normalizeSpeech(rendered.getChannelData(0)),
+      durationMs: Math.round(decoded.duration * 1000),
+    };
   } finally {
     await ctx.close();
   }

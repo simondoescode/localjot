@@ -41,10 +41,12 @@ export async function releaseModel(ref) {
 
 export async function loadTranscriber(modelId, onProgress) {
   const { pipeline } = await getTransformers();
-  const device = await pickDevice();
+  // WASM is slower than WebGPU, but is substantially more reliable across
+  // browsers and avoids provider-specific Whisper inference failures.
+  const device = "wasm";
   return pipeline("automatic-speech-recognition", modelId, {
     device,
-    dtype: device === "webgpu" ? "q4" : "q8",
+    dtype: "q8",
     progress_callback: onProgress,
   });
 }
